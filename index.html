@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>From Pencils to Pixels</title>
+<title>Notebook Mogul</title>
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Patrick+Hand&display=swap" rel="stylesheet">
 <style>
 /* ===== RESET & BASE ===== */
@@ -928,10 +928,10 @@ function showTOS() {
     <h2>Terms of Service</h2>
     <div class="tos-modal-body">
       <h3>1. Acceptance of Terms</h3>
-      <p>By accessing and using this application (\u201CFrom Pencils to Pixels\u201D), you agree to be bound by these Terms of Service. If you are under 18 years of age, your parent or guardian must agree to these terms on your behalf.</p>
+      <p>By accessing and using this application (\u201CNotebook Mogul\u201D), you agree to be bound by these Terms of Service. If you are under 18 years of age, your parent or guardian must agree to these terms on your behalf.</p>
 
       <h3>2. Description of Service</h3>
-      <p>From Pencils to Pixels is an educational business simulation game designed to teach financial literacy concepts. The game is provided for educational and entertainment purposes only and does not constitute financial advice.</p>
+      <p>Notebook Mogul is an educational business simulation game designed to teach financial literacy concepts. The game is provided for educational and entertainment purposes only and does not constitute financial advice.</p>
 
       <h3>3. Intellectual Property</h3>
       <p>All content, design, code, game mechanics, characters, text, graphics, and other materials in this application are the exclusive intellectual property of [Owner Name] and are protected by applicable copyright, trademark, and other intellectual property laws. No part of this application may be reproduced, distributed, modified, reverse-engineered, or used for any commercial purpose without prior written permission.</p>
@@ -989,7 +989,7 @@ function render() {
   const upgrade = checkWagonUpgrade();
   
   app.innerHTML = `
-    <h1>${playerInfo.businessName || 'From Pencils to Pixels'}</h1>
+    <h1>${playerInfo.businessName || 'Notebook Mogul'}</h1>
     <div class="status-bar">
       <div class="stat"><span class="stat-label">Cash</span><span class="stat-value">$${G.cash.toFixed(2)}</span></div>
       <div class="stat"><span class="stat-label">Net Worth</span><span class="stat-value">$${G.netWorth.toFixed(2)}</span></div>
@@ -1192,7 +1192,7 @@ function renderStart(app) {
   // If we don't have names yet, show name entry
   if (!playerInfo.playerName || !playerInfo.businessName) {
     app.innerHTML = `<div class="start-screen">
-      <h1>\uD83D\uDCD3 From Pencils to Pixels</h1>
+      <h1>\uD83D\uDCD3 Notebook Mogul</h1>
       <p class="subtitle">An Educational Business Simulation</p>
       <div style="text-align:left;margin:20px 0">
         <label class="name-label">\uD83D\uDC64 Your Name</label>
@@ -1207,7 +1207,7 @@ function renderStart(app) {
       </div>
       <button class="btn btn-primary btn-lg" style="width:100%;margin-top:4px" onclick="submitNames()">Let\u2019s Go! \u2192</button>
       <p class="text-muted" style="margin-top:10px;font-size:.7rem">Your name appears on your market report. Your business name appears during gameplay.</p>
-      <div class="copyright-footer">\u00A9 2026 [Owner Name]. All rights reserved.<br>From Pencils to Pixels\u2122 is a proprietary educational simulation.</div>
+      <div class="copyright-footer">\u00A9 2026 [Owner Name]. All rights reserved.<br>Notebook Mogul\u2122 is a proprietary educational simulation.</div>
     </div>`;
     return;
   }
