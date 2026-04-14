@@ -1,0 +1,1504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>From Pencils to Pixels</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Patrick+Hand&display=swap" rel="stylesheet">
+<style>
+/* ===== RESET & BASE ===== */
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Nunito',sans-serif;background:#c8bda0;min-height:100vh;display:flex;justify-content:center;align-items:flex-start;padding:12px 6px;background-image:url("data:image/svg+xml,%3Csvg width='100' height='100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='.7' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100' height='100' filter='url(%23n)' opacity='.06'/%3E%3C/svg%3E")}
+/* ===== NOTEBOOK CONTAINER ===== */
+.notebook{background:#faf5eb;max-width:440px;width:100%;min-height:94vh;border-radius:2px 10px 10px 2px;box-shadow:4px 4px 20px rgba(0,0,0,.22),inset 0 0 60px rgba(139,119,91,.06);position:relative;padding:0 0 0 42px;border-left:3px solid #c43e3e;overflow:hidden}
+.notebook::before{content:'';position:absolute;left:0;top:0;bottom:0;width:42px;background:linear-gradient(90deg,#e6dbc6 0%,#e0d5be 30px,#ece4d4 31px,#faf5eb 42px);z-index:2}
+/* spiral rings */
+.notebook::after{content:'';position:absolute;left:3px;top:24px;bottom:24px;width:20px;background:repeating-linear-gradient(180deg,transparent 0px,transparent 16px,#a89880 16px,#a89880 18px,#c8bda0 18px,#c8bda0 28px,#a89880 28px,#a89880 30px,transparent 30px,transparent 46px);z-index:3}
+.ruled-lines{position:absolute;inset:0;background:repeating-linear-gradient(180deg,transparent 0,transparent 29px,#ddd5c4 29px,#ddd5c4 30px);pointer-events:none;opacity:.25;z-index:0}
+.content{position:relative;z-index:1;padding:14px 14px 20px 10px}
+/* ===== TYPOGRAPHY ===== */
+h1{font-family:'Patrick Hand',cursive;font-size:1.5rem;font-weight:400;color:#4a3a2a;text-align:center;margin-bottom:4px;letter-spacing:.5px}
+h2{font-family:'Patrick Hand',cursive;font-size:1.15rem;font-weight:400;color:#5a4a3a;margin:12px 0 6px}
+h3{font-size:.88rem;font-weight:700;color:#6b5b4a}
+.subtitle{font-size:.8rem;color:#8a7a68;text-align:center;margin-bottom:10px}
+/* ===== STATUS BAR ===== */
+.status-bar{background:linear-gradient(135deg,#4a6a3a,#3d5c30);color:#fff;padding:8px 10px;border-radius:8px;margin-bottom:6px;display:grid;grid-template-columns:1fr 1fr;gap:3px;font-size:.75rem;font-weight:600;box-shadow:0 2px 6px rgba(74,106,58,.3)}
+.status-bar .stat{display:flex;justify-content:space-between}
+.status-bar .stat-label{opacity:.75;font-size:.68rem;text-transform:uppercase;letter-spacing:.3px}
+.status-bar .stat-value{font-weight:800}
+.status-bar .location-row{grid-column:1/-1;text-align:center;font-size:.82rem;padding-top:3px;border-top:1px solid rgba(255,255,255,.2);margin-top:1px}
+/* ===== WAGON BAR ===== */
+.wagon-bar{background:#e4dbc8;border-radius:10px;height:10px;margin:4px 0 6px;overflow:hidden;box-shadow:inset 0 1px 3px rgba(0,0,0,.1)}
+.wagon-fill{height:100%;background:linear-gradient(90deg,#5a8a4a,#72a85a);border-radius:10px;transition:width .4s ease}
+.wagon-fill.warning{background:linear-gradient(90deg,#c48a2a,#e0a840)}
+.wagon-fill.full{background:linear-gradient(90deg,#b83a2a,#d04a3a)}
+.wagon-text{font-size:.68rem;font-weight:700;color:#7a6a58;text-align:right}
+/* ===== TABS ===== */
+.tabs{display:flex;gap:1px;margin-bottom:0}
+.tab{flex:1;padding:8px 2px;text-align:center;font-size:.68rem;font-weight:700;background:#e4dbc8;border:1px solid #d0c4a8;border-bottom:none;border-radius:8px 8px 0 0;cursor:pointer;color:#8a7a68;transition:all .2s;text-transform:uppercase;letter-spacing:.4px}
+.tab:hover{background:#f0e8d4;color:#5a4a3a}
+.tab.active{background:#faf5eb;color:#4a3a2a;border-bottom:1px solid #faf5eb;margin-bottom:-1px;position:relative;z-index:1;box-shadow:0 -2px 4px rgba(0,0,0,.04)}
+.tab-content{border:1px solid #d0c4a8;border-radius:0 0 8px 8px;padding:10px;min-height:300px;background:#faf5eb;animation:fadeIn .2s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+/* ===== CARDS ===== */
+.card{background:#fff;border:1px solid #e0d6c2;border-radius:8px;padding:8px 10px;margin-bottom:6px;box-shadow:0 1px 4px rgba(0,0,0,.05);transition:transform .15s,box-shadow .15s}
+.card:hover{transform:translateY(-1px);box-shadow:0 3px 8px rgba(0,0,0,.08)}
+.card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:3px}
+.card-title{font-weight:700;font-size:.85rem;color:#4a3a2a}
+.price{font-weight:800;color:#4a6a3a;font-size:.9rem}
+.price.sell{color:#b85c2a}
+/* ===== BUTTONS ===== */
+.btn{display:inline-flex;align-items:center;justify-content:center;padding:8px 14px;border:none;border-radius:8px;font-family:'Nunito',sans-serif;font-weight:700;font-size:.8rem;cursor:pointer;transition:all .2s;position:relative;overflow:hidden}
+.btn:active{transform:scale(.96)}
+.btn-primary{background:#4a6a3a;color:#fff;box-shadow:0 2px 4px rgba(74,106,58,.25)}.btn-primary:hover{background:#3d5c30;box-shadow:0 3px 8px rgba(74,106,58,.35)}
+.btn-sell{background:#b85c2a;color:#fff;box-shadow:0 2px 4px rgba(184,92,42,.25)}.btn-sell:hover{background:#a04c1a}
+.btn-travel{background:#3a5a7a;color:#fff;box-shadow:0 2px 4px rgba(58,90,122,.25)}.btn-travel:hover{background:#2a4a6a}
+.btn-tip{background:#7a5a3a;color:#fff;box-shadow:0 2px 4px rgba(122,90,58,.25)}.btn-tip:hover{background:#6a4a2a}
+.btn-sm{padding:4px 8px;font-size:.7rem;border-radius:6px}
+.btn-lg{padding:10px 20px;font-size:.92rem;border-radius:10px}
+.btn:disabled{opacity:.35;cursor:not-allowed;transform:none;box-shadow:none}
+/* ===== BANNER ===== */
+.banner{padding:7px 10px;border-radius:8px;font-size:.75rem;font-weight:600;text-align:center;margin-bottom:6px;line-height:1.35;animation:slideDown .25s ease}
+@keyframes slideDown{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+.banner-warn{background:#fef9e7;color:#7a6210;border:1px solid #f0d860}
+.banner-info{background:#eaf5ec;color:#2a5a30;border:1px solid #72b87a}
+.banner-danger{background:#fdeced;color:#6a1a20;border:1px solid #e06a70}
+/* ===== MODAL ===== */
+.modal-overlay{position:fixed;inset:0;background:rgba(30,25,18,.6);display:flex;align-items:center;justify-content:center;z-index:100;padding:16px;animation:modalFadeIn .25s ease;backdrop-filter:blur(2px)}
+@keyframes modalFadeIn{from{opacity:0}to{opacity:1}}
+.modal{background:#faf5eb;border-radius:14px;padding:22px 18px;max-width:380px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.35),0 0 0 1px rgba(0,0,0,.05);text-align:center;animation:modalSlideUp .3s ease}
+@keyframes modalSlideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+.modal h2{margin-bottom:8px;font-family:'Patrick Hand',cursive;font-size:1.2rem;color:#4a3a2a}.modal p{font-size:.82rem;color:#5a4a3a;margin-bottom:10px;line-height:1.5}
+.modal .tip-text{font-size:.76rem;color:#7a5a3a;font-style:italic;margin-top:8px;padding:8px 10px;background:#f0e8d4;border-radius:8px;border-left:3px solid #b85c2a;text-align:left;line-height:1.4}
+.modal-buttons{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:4px}
+/* ===== INVENTORY GRID ===== */
+.inv-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.inv-item{background:#fff;border:1px solid #e0d6c2;border-radius:10px;padding:10px 6px;text-align:center;transition:transform .15s}
+.inv-item:hover{transform:scale(1.02)}
+.inv-item .emoji{font-size:1.8rem;display:block;margin-bottom:2px}
+.inv-item .name{font-size:.72rem;font-weight:700;color:#5a4a3a}
+.inv-item .count{font-size:1.1rem;font-weight:800;color:#4a6a3a}
+/* ===== PROGRESS TRACK ===== */
+.progress-track{display:flex;gap:3px;margin:6px 0}
+.progress-dot{flex:1;height:8px;border-radius:4px;background:#e0d6c2;transition:background .3s}
+.progress-dot.unlocked{background:#4a6a3a}
+.progress-dot.current{background:#b85c2a;animation:pulse .8s infinite alternate}
+@keyframes pulse{from{opacity:.6}to{opacity:1}}
+/* ===== SPARKLINE ===== */
+.chart-container{background:#fff;border:1px solid #e0d6c2;border-radius:10px;padding:8px;margin:8px 0;box-shadow:inset 0 1px 3px rgba(0,0,0,.04)}
+canvas{width:100%;height:120px}
+/* ===== ENCOUNTER LOG ===== */
+.encounter{display:flex;align-items:center;gap:8px;padding:5px 0;font-size:.76rem;border-bottom:1px solid #f0e8d4}
+.encounter:last-child{border-bottom:none}
+.encounter .emoji{font-size:1.2rem}
+/* ===== START SCREEN ===== */
+.start-screen{text-align:center;padding:16px 6px}
+.start-screen h1{font-size:1.7rem;margin-bottom:2px}
+.mode-card{background:#fff;border:2px solid #e0d6c2;border-radius:12px;padding:14px;margin:8px 0;cursor:pointer;transition:all .25s;text-align:left;position:relative;overflow:hidden}
+.mode-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:#4a6a3a;opacity:0;transition:opacity .2s}
+.mode-card:hover{border-color:#4a6a3a;transform:translateY(-2px);box-shadow:0 6px 16px rgba(0,0,0,.1)}
+.mode-card:hover::before{opacity:1}
+.mode-card.selected{border-color:#4a6a3a;background:#f0f8e8}
+.mode-card h3{font-family:'Patrick Hand',cursive;font-size:1.1rem;margin-bottom:4px;color:#4a3a2a}.mode-card p{font-size:.76rem;color:#6b5b4a;line-height:1.4}
+.mode-detail{font-size:.76rem;color:#5a4a3a;margin:3px 0;line-height:1.3}
+.mode-detail .label{font-weight:700;color:#6b5b4a}
+.mode-list{margin:4px 0 4px 16px;padding:0}
+.mode-list li{font-size:.76rem;color:#5a4a3a;margin:2px 0;line-height:1.35}
+/* ===== CALIBRATION ===== */
+.cal-product{display:flex;align-items:center;gap:10px;background:#fff;border:1px solid #e0d6c2;border-radius:10px;padding:10px;margin:6px 0}
+.cal-product .emoji{font-size:1.6rem}
+.cal-info{flex:1;font-size:.82rem}
+.cal-info .name{font-weight:700}
+/* ===== END SCREEN ===== */
+.end-screen{padding:8px 4px}
+.grade-display{font-family:'Patrick Hand',cursive;font-size:3.5rem;font-weight:400;text-align:center;margin:8px 0;text-shadow:0 2px 4px rgba(0,0,0,.1);animation:gradeReveal .5s ease}
+@keyframes gradeReveal{from{opacity:0;transform:scale(.7)}to{opacity:1;transform:scale(1)}}
+.grade-A{color:#4a6a3a}.grade-B{color:#5a8a4a}.grade-C{color:#b85c2a}.grade-D{color:#c9802a}.grade-F{color:#b83a2a}
+.end-stat{display:flex;justify-content:space-between;padding:5px 0;font-size:.82rem;border-bottom:1px solid #f0e8d4}
+.end-stat:last-child{border-bottom:none}
+.lesson-card{background:#f5ede0;border-radius:8px;padding:9px 12px;margin:5px 0;font-size:.78rem;line-height:1.45;color:#4a3a2a;border-left:3px solid #b85c2a}
+.who-met{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f0e8d4;font-size:.8rem}
+.who-met:last-child{border-bottom:none}
+.who-met .emoji{font-size:1.3rem}
+/* ===== UPGRADE OFFER ===== */
+.upgrade-card{background:linear-gradient(135deg,#faf5eb,#fff);border:2px solid #b85c2a;border-radius:12px;padding:14px;margin:8px 0;text-align:center;box-shadow:0 2px 8px rgba(184,92,42,.15)}
+.upgrade-card h3{font-family:'Patrick Hand',cursive;color:#b85c2a;font-size:1.05rem}
+/* ===== MISC ===== */
+.hidden{display:none!important}
+.text-center{text-align:center}
+.text-muted{color:#8a7a68;font-size:.76rem}
+.mt-2{margin-top:8px}.mb-2{margin-bottom:8px}
+.flex-between{display:flex;justify-content:space-between;align-items:center}
+.badge{display:inline-block;padding:2px 6px;border-radius:10px;font-size:.66rem;font-weight:700}
+.badge-new{background:#eaf5ec;color:#2a5a30}
+/* ===== NAME ENTRY ===== */
+.name-input{width:100%;padding:10px 12px;border:2px solid #d0c4a8;border-radius:8px;font-family:'Patrick Hand',cursive;font-size:1.1rem;color:#4a3a2a;background:#fff;outline:none;transition:border-color .2s}
+.name-input:focus{border-color:#4a6a3a}
+.name-input::placeholder{color:#b8a890}
+.name-label{font-family:'Patrick Hand',cursive;font-size:.95rem;color:#5a4a3a;margin-bottom:4px;display:block}
+/* ===== ADVISOR (MAEVE) ===== */
+.advisor-modal{background:#faf5eb;border-radius:14px;padding:18px 16px;max-width:380px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.35),0 0 0 1px rgba(0,0,0,.05);animation:modalSlideUp .3s ease}
+.advisor-header{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.advisor-avatar{width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,#e8c87a,#d4a84a);display:flex;align-items:center;justify-content:center;font-size:1.6rem;box-shadow:0 2px 6px rgba(0,0,0,.15);flex-shrink:0}
+.advisor-name{font-family:'Patrick Hand',cursive;font-size:1.05rem;color:#4a3a2a}
+.advisor-title{font-size:.68rem;color:#8a7a68}
+.advisor-body{font-size:.82rem;color:#4a3a2a;line-height:1.5;margin-bottom:12px}
+.advisor-body strong{color:#2B4C7E}
+/* ===== RESPONSIVE ===== */
+@media(max-width:360px){.notebook{padding-left:32px}.notebook::before{width:32px;background:linear-gradient(90deg,#e6dbc6 0%,#e0d5be 22px,#ece4d4 23px,#faf5eb 32px)}.notebook::after{left:1px;width:16px}.content{padding:10px 10px 14px 6px}.tab{font-size:.62rem;padding:6px 2px}}
+/* ===== TOS & COPYRIGHT ===== */
+.tos-check{display:flex;align-items:flex-start;gap:8px;margin:12px 0;text-align:left}
+.tos-check input[type="checkbox"]{margin-top:3px;width:18px;height:18px;accent-color:#4a6a3a;flex-shrink:0}
+.tos-check label{font-size:.75rem;color:#5a4a3a;line-height:1.4;cursor:pointer}
+.tos-link{color:#2B4C7E;text-decoration:underline;cursor:pointer}
+.copyright-footer{text-align:center;font-size:.65rem;color:#a89880;padding:12px 0 4px;border-top:1px solid #e4dbc8;margin-top:16px}
+.tos-modal-body{font-size:.75rem;color:#4a3a2a;line-height:1.5;text-align:left;max-height:60vh;overflow-y:auto;padding:10px;background:#fff;border:1px solid #e0d6c2;border-radius:8px;margin-bottom:10px}
+.tos-modal-body h3{font-size:.85rem;color:#2B4C7E;margin:10px 0 4px}
+.tos-modal-body p{margin-bottom:6px}
+</style>
+</head>
+<body>
+<div class="notebook">
+<div class="ruled-lines"></div>
+<div class="content" id="app">
+<!-- Content injected by JS -->
+</div>
+</div>
+
+<script>
+// ===================================================================
+// FROM PENCILS TO PIXELS v11
+// ===================================================================
+
+// ===== GAME CONFIGURATION =====
+const PRODUCTS = [
+  { id:'lemonade', name:'Lemonade', emoji:'🍋', buyMin:.50, buyMax:1.20, sellMin:.80, sellMax:2.00, unlockDay:1 },
+  { id:'water', name:'Bottled Water', emoji:'💧', buyMin:.30, buyMax:.80, sellMin:.60, sellMax:1.50, unlockDay:4 },
+  { id:'cookies', name:'Cookies', emoji:'🍪', buyMin:.80, buyMax:1.80, sellMin:1.20, sellMax:3.00, unlockDay:7 },
+  { id:'candy', name:'Candy', emoji:'🍬', buyMin:.40, buyMax:1.00, sellMin:.70, sellMax:1.80, unlockDay:10 },
+  { id:'soda', name:'Soda Pop', emoji:'🥤', buyMin:.60, buyMax:1.40, sellMin:1.00, sellMax:2.50, unlockDay:13 },
+  { id:'toys', name:'Small Toys', emoji:'🧸', buyMin:1.50, buyMax:3.50, sellMin:2.50, sellMax:6.00, unlockDay:15 }
+];
+
+const NEIGHBORHOODS = [
+  { id:'maplewood', name:'Maplewood', emoji:'🌳', desc:'Quiet suburban street', mods:{lemonade:1.2,water:.85,cookies:1.0,candy:1.0,soda:1.0,toys:.8} },
+  { id:'riverside', name:'Riverside', emoji:'🌊', desc:'Busy park by the river', mods:{lemonade:1.15,water:1.2,cookies:.85,candy:1.0,soda:1.05,toys:.95} },
+  { id:'sunnydale', name:'Sunnydale', emoji:'☀️', desc:'School and playground area', mods:{lemonade:.95,water:.95,cookies:1.2,candy:1.2,soda:1.15,toys:1.15} },
+  { id:'heights', name:'The Heights', emoji:'🏔️', desc:'Upscale hilltop neighborhood', mods:{lemonade:.8,water:.85,cookies:1.0,candy:.95,soda:1.0,toys:1.3} }
+];
+
+const ANTAGONISTS = {
+  crawley: { name:'Mrs. Crawley', emoji:'👵', title:'The Neighborhood Busybody' },
+  davis: { name:'Inspector Davis', emoji:'🕵️', title:'Health Inspector' },
+  eddie: { name:'Slick Eddie', emoji:'😏', title:'The Rival Kid' },
+  nature: { name:'Mother Nature', emoji:'🌧️', title:'The Weather' }
+};
+
+const EVENTS = [
+  // Mrs. Crawley
+  { id:'crawley1', ant:'crawley', name:'Called the City!', desc:'Mrs. Crawley called the city council about your stand. This is called a regulatory complaint \u2014 when someone reports your business to the authorities. No selling today!', effect:'no_sell', minDay:1, tip:'In real business, regulatory complaints can shut you down temporarily. Maintaining good community relations helps prevent them.' },
+  { id:'crawley2', ant:'crawley', name:'Permit Problems', desc:'Mrs. Crawley reported you for operating without a permit. A permit is official permission to run a business \u2014 and not having one means a $5 fine!', effect:'fine', value:5, minDay:3, tip:'Licensing and permits are a cost of doing business. Smart owners factor compliance costs into their budget.' },
+  { id:'crawley3', ant:'crawley', name:'Rallied the Neighbors', desc:'Mrs. Crawley organized a boycott \u2014 that\u2019s when people agree to stop buying from you. Sell prices are halved at this location today.', effect:'half_sell', minDay:8, tip:'A boycott is a form of community pressure. Your reputation affects your revenue. In business, this is called brand risk.' },
+  // Inspector Davis
+  { id:'davis1', ant:'davis', name:'Surprise Inspection!', desc:'Inspector Davis is conducting a compliance audit \u2014 checking whether your business meets health and safety regulations!', effect:'lose_inv', value:.30, minDay:3, tip:'Regulatory compliance means following the rules set by authorities. Failing an audit can cost you inventory, time, or money.' },
+  { id:'davis2', ant:'davis', name:'Compliance Warning', desc:'Inspector Davis issued a compliance warning \u2014 in business, regulators often give you a chance to fix problems before penalties kick in. Move by tomorrow or pay a $10 fine!', effect:'compliance_warn', value:10, minDay:5, tip:'A compliance warning is a signal to act. Smart business owners treat warnings as opportunities to avoid bigger costs.' },
+  { id:'davis3', ant:'davis', name:'Failed Inspection!', desc:'You failed the inspection! In business, a failed audit means penalties. You lose a day of operations and pay an $8 fine.', effect:'day_lost_fine', value:8, minDay:9, tip:'Failed inspections cost both time and money. The total impact on your business is called a regulatory penalty.' },
+  // Slick Eddie
+  { id:'eddie1', ant:'eddie', name:'Set Up Shop!', desc:'Slick Eddie opened a competing stand nearby! When a competitor enters your market, it creates competitive pressure \u2014 your sell prices drop 40% here.', effect:'drop_sell', value:.40, minDay:2, tip:'Competition drives prices down. When rivals enter your market, you can stay and accept lower margins, or find a new market with less competition.' },
+  { id:'eddie2', ant:'eddie', name:'Bought All the Stock!', desc:'Eddie bought the supply before you could. When demand for supply increases, the cost of goods goes up. Your buy prices here just rose 40%.', effect:'raise_buy', value:.40, minDay:4, tip:'This is supply-side competition \u2014 rivals competing for the same inventory. It raises your cost of goods, which squeezes your profit margin.' },
+  { id:'eddie3', ant:'eddie', name:'Stole Your Customers!', desc:'Eddie undercut your prices and captured your customer base. When a competitor offers lower prices, customers switch \u2014 that\u2019s called losing market share. No sales today!', effect:'no_sell', minDay:7, tip:'Price wars happen when competitors undercut each other. Smart businesses compete on value and service, not just price.' },
+  // Mother Nature
+  { id:'nature1', ant:'nature', name:'Thunderstorm!', desc:'A storm hit! This is an example of an external risk \u2014 an event outside your control that disrupts your business operations.', effect:'storm', value:.20, minDay:1, tip:'External risks like weather can\u2019t be prevented, only prepared for. Maintaining cash reserves gives you a buffer against the unexpected.' },
+  { id:'nature2', ant:'nature', name:'Freezing Cold Snap!', desc:'A cold snap caused a demand shock \u2014 an unexpected drop in how much people want cold drinks. When demand goes down, prices go down. Lemonade and water sell for 70% less today. The opposite is also true: on a hot day, demand for cold drinks goes up and so do prices. This is called supply and demand.', effect:'cold_snap', minDay:1, tip:'Demand is how much people want to buy something. When demand is high (like lemonade on a hot day), prices go up. When demand drops (like cold drinks in a freeze), prices fall. Diversification \u2014 carrying different product types \u2014 protects you when one product\u2019s demand collapses.' },
+  { id:'nature3', ant:'nature', name:'Supply Shortage!', desc:'Bad weather disrupted the supply chain \u2014 the system that moves products from makers to sellers. This means everything costs more to buy right now. ALL buy prices are up 50% everywhere! You\u2019ll need to spend more cash to stock up, so plan carefully.', effect:'global_buy_up', value:.50, minDay:4, tip:'A supply chain disruption raises the cost of goods for every business, not just yours. This is called systemic risk \u2014 risk that affects the entire market. Having cash reserves helps you survive when costs spike unexpectedly.' }
+];
+
+const WAGON_UPGRADES = {
+  starter: [
+    { threshold:100, minDay:5, cost:15, capacity:75, label:'Upgraded Wagon' },
+    { threshold:150, minDay:10, cost:25, capacity:100, label:'Second Wagon' }
+  ],
+  full: [
+    { threshold:150, minDay:8, cost:20, capacity:75, label:'Upgraded Wagon' },
+    { threshold:300, minDay:16, cost:35, capacity:100, label:'Second Wagon' }
+  ]
+};
+
+// ===== PLAYER INFO (persists across games) =====
+let playerInfo = { playerName: '', businessName: '' };
+
+// ===== GAME STATE =====
+let G = {};
+
+function newGame(mode) {
+  const days = mode === 'starter' ? 15 : 30;
+  G = {
+    mode, days, day:1, cash:50, location:0,
+    inventory:{}, netWorth:50, netWorthHistory:[50],
+    wagonCapacity:50, wagonUpgradeIndex:0,
+    soldToday:false, hasSoldThisTurn:false, boughtHere:false, arrivedViaTravel:false, daysAtLocation:0,
+    totalRevenue:0, totalProfit:0, travelCount:0,
+    encounters:[], tipSpend:0, tipCount:0,
+    unlocked: mode === 'full' ? PRODUCTS.map(p=>p.id) : ['lemonade'],
+    prices:null, activeEffects:{}, complianceWarning:false,
+    personalBest: loadPersonalBest(mode),
+    // Adaptive difficulty
+    adaptive:{ skillScore:0, eventBoost:0, volatilityMult:1.0, eddieAggro:1.0 },
+    // Sell tracking
+    sellHistory:[], buyHistory:[],
+    // Loss tracking
+    lossCount:0, lossTotalUnits:0, lossFirstSeen:false,
+    // Average buy price tracking per product
+    avgBuyPrice:{},
+    activeTab:'buy', gameOver:false, lastEvent:null,
+    // Holistic grading tracking
+    locationsVisited:{}, productsBought:{}, productsSold:{},
+    // Calibration result
+    calSkill: 0,
+    // Career Mode
+    isCareer: false, careerLevel: null, profitStreak: 0, bestProfitStreak: 0
+  };
+  PRODUCTS.forEach(p => G.inventory[p.id] = 0);
+  G.locationsVisited[NEIGHBORHOODS[0].id] = 1;
+  generatePrices();
+  render();
+}
+
+function startCareerMode(carryOver) {
+  // Carry over cash, inventory, wagon from the completed Full Market game
+  const prevCash = carryOver.cash;
+  const prevInventory = carryOver.inventory;
+  const prevWagon = carryOver.wagonCapacity;
+  const prevUpgradeIndex = carryOver.wagonUpgradeIndex;
+  const prevAvgBuy = carryOver.avgBuyPrice;
+
+  G = {
+    mode: 'full', days: 30, day: 1, cash: prevCash, location: 0,
+    inventory: {}, netWorth: 0, netWorthHistory: [],
+    wagonCapacity: prevWagon, wagonUpgradeIndex: prevUpgradeIndex,
+    soldToday: false, hasSoldThisTurn: false, boughtHere: false, arrivedViaTravel: false, daysAtLocation: 0,
+    totalRevenue: 0, totalProfit: 0, travelCount: 0,
+    encounters: [], tipSpend: 0, tipCount: 0,
+    unlocked: PRODUCTS.map(p => p.id),
+    prices: null, activeEffects: {}, complianceWarning: false,
+    personalBest: loadPersonalBest('career_1_1'),
+    adaptive: { skillScore: 0.3, eventBoost: 0, volatilityMult: 1.1, eddieAggro: 1.1 },
+    sellHistory: [], buyHistory: [],
+    lossCount: 0, lossTotalUnits: 0, lossFirstSeen: false,
+    avgBuyPrice: { ...prevAvgBuy },
+    activeTab: 'buy', gameOver: false, lastEvent: null,
+    locationsVisited: {}, productsBought: {}, productsSold: {},
+    calSkill: 0.3,
+    // Career Mode fields
+    isCareer: true, careerLevel: '1-1', profitStreak: 0, bestProfitStreak: 0
+  };
+  // Copy inventory
+  PRODUCTS.forEach(p => { G.inventory[p.id] = prevInventory[p.id] || 0; });
+  G.locationsVisited[NEIGHBORHOODS[0].id] = 1;
+  // Calculate starting net worth
+  generatePrices();
+  updateNetWorth();
+  G.netWorthHistory = [G.netWorth];
+  render();
+  showModal({
+    type: 'career_start', title: 'Career Mode: The Hustle',
+    desc: 'You\u2019ve proven you can run a business. Now prove you can run it well. This is a new 30-day season \u2014 same market, higher expectations. Earn an A grade to advance to Level 1-2.',
+    emoji: '\uD83C\uDF1F',
+    tip: 'Your cash and inventory carried over. The market adapts to experienced players. Focus on margin discipline, diversification, and smart market research.'
+  });
+}
+
+// ===== PERSISTENCE =====
+function loadPersonalBest(mode) {
+  try { return parseFloat(localStorage.getItem('fptp_pb_'+mode)) || 50; } catch(e){ return 50; }
+}
+function savePersonalBest(mode, val) {
+  try { localStorage.setItem('fptp_pb_'+mode, val); } catch(e){}
+}
+
+// ===== PRICE ENGINE =====
+function generatePrices() {
+  G.prices = {};
+  const vm = G.adaptive.volatilityMult;
+  NEIGHBORHOODS.forEach(n => {
+    G.prices[n.id] = {};
+    PRODUCTS.forEach(p => {
+      const mod = n.mods[p.id] || 1.0;
+      // Buy price
+      const buyRange = p.buyMax - p.buyMin;
+      const buyBase = p.buyMin + Math.random() * buyRange;
+      // Sell price with location modifier and volatility
+      const sellRange = (p.sellMax - p.sellMin) * vm;
+      const sellBase = p.sellMin + Math.random() * sellRange;
+      let sellPrice = sellBase * mod;
+      // Apply saturation if current location
+      if (n.id === NEIGHBORHOODS[G.location].id) {
+        const satPenalty = Math.max(0, (G.daysAtLocation - 1) * 0.13);
+        sellPrice *= (1 - Math.min(satPenalty, 0.50));
+      }
+      // Apply active effects
+      if (G.activeEffects.half_sell && n.id === NEIGHBORHOODS[G.location].id) sellPrice *= 0.5;
+      if (G.activeEffects.drop_sell && n.id === NEIGHBORHOODS[G.location].id) sellPrice *= (1 - G.activeEffects.drop_sell);
+      if (G.activeEffects.cold_snap && (p.id==='lemonade'||p.id==='water') && n.id === NEIGHBORHOODS[G.location].id) sellPrice *= 0.3;
+      let buyPrice = buyBase;
+      if (G.activeEffects.raise_buy && n.id === NEIGHBORHOODS[G.location].id) buyPrice *= (1 + G.activeEffects.raise_buy);
+      if (G.activeEffects.global_buy_up) buyPrice *= (1 + G.activeEffects.global_buy_up);
+      G.prices[n.id][p.id] = { buy: Math.round(buyPrice*100)/100, sell: Math.round(sellPrice*100)/100 };
+    });
+  });
+}
+
+// ===== WAGON =====
+function totalInventory() { return Object.values(G.inventory).reduce((s,v)=>s+v,0); }
+function wagonFree() { return G.wagonCapacity - totalInventory(); }
+function wagonPercent() { return (totalInventory() / G.wagonCapacity) * 100; }
+
+// ===== UNLOCKED PRODUCTS =====
+function getUnlocked() {
+  if (G.mode === 'full') return PRODUCTS;
+  return PRODUCTS.filter(p => G.day >= p.unlockDay);
+}
+function checkNewUnlocks() {
+  if (G.mode !== 'starter') return null;
+  const newly = PRODUCTS.filter(p => p.unlockDay === G.day && !G.unlocked.includes(p.id));
+  newly.forEach(p => G.unlocked.push(p.id));
+  return newly.length > 0 ? newly : null;
+}
+
+// ===== ADAPTIVE DIFFICULTY =====
+function updateAdaptive() {
+  if (G.mode !== 'full') return;
+  // Calculate skill score based on performance
+  const expectedNW = 50 + (G.day * 5); // rough expected curve
+  const ratio = G.netWorth / expectedNW;
+  if (ratio > 1.5) G.adaptive.skillScore = Math.min(G.adaptive.skillScore + 0.1, 1.0);
+  else if (ratio > 1.2) G.adaptive.skillScore = Math.min(G.adaptive.skillScore + 0.05, 1.0);
+  // Adjust parameters
+  G.adaptive.eventBoost = G.adaptive.skillScore * 0.15;
+  G.adaptive.volatilityMult = 1.0 + (G.adaptive.skillScore * 0.4);
+  G.adaptive.eddieAggro = 1.0 + (G.adaptive.skillScore * 0.5);
+}
+
+// ===== EVENT SYSTEM =====
+function rollForEvent() {
+  // Base probability: starts lower, ramps up over game. Full Market ramps slower over 30 days.
+  const progress = G.day / G.days; // 0 to 1
+  const baseProb = G.mode === 'full'
+    ? 0.20 + progress * 0.20 + G.adaptive.eventBoost   // 20%-40% for Full Market
+    : 0.25 + progress * 0.25;                            // 25%-50% for Starter
+  if (Math.random() > baseProb) return null;
+  // Cooldown: no events on consecutive days (skip if last encounter was yesterday)
+  const lastEncDay = G.encounters.length > 0 ? G.encounters[G.encounters.length - 1].day : 0;
+  if (G.day - lastEncDay <= 1 && G.day > 2) return null;
+  // Check compliance warning penalty
+  if (G.complianceWarning) {
+    G.complianceWarning = false;
+    G.cash -= 10;
+    G.encounters.push({ ...ANTAGONISTS.davis, eventName:'Compliance Fine!', day:G.day });
+    return { type:'compliance_fine', title:'Compliance Fine!', desc:'You didn\'t move! Inspector Davis fined you $10.', emoji:'🕵️', tip:'Ignoring warnings costs money. Act on information while you still can.' };
+  }
+  const eligible = EVENTS.filter(e => G.day >= e.minDay);
+  if (eligible.length === 0) return null;
+  const event = eligible[Math.floor(Math.random() * eligible.length)];
+  const ant = ANTAGONISTS[event.ant];
+  G.encounters.push({ ...ant, eventName:event.name, day:G.day });
+  // Apply effects
+  G.activeEffects = {};
+  G.complianceWarning = false;
+  switch(event.effect) {
+    case 'no_sell': G.soldToday = true; G.hasSoldThisTurn = true; break;
+    case 'fine': G.cash = Math.max(0, G.cash - event.value); break;
+    case 'half_sell': G.activeEffects.half_sell = true; generatePrices(); break;
+    case 'lose_inv': {
+      const invBefore = totalInventory();
+      if (invBefore > 0) {
+        const pct = event.value;
+        const confiscated = [];
+        Object.keys(G.inventory).forEach(k => {
+          const loss = Math.floor(G.inventory[k] * pct);
+          if (loss > 0) {
+            const prod = PRODUCTS.find(p => p.id === k);
+            confiscated.push(`${loss} ${prod ? prod.name : k}`);
+            G.inventory[k] -= loss;
+          }
+        });
+        const confStr = confiscated.join(', ');
+        event._dynamicDesc = `Inspector Davis conducted a compliance audit and confiscated 30% of your inventory: ${confStr}. Regulatory compliance means meeting health and safety standards \u2014 failing costs you product.`;
+      } else {
+        G.cash = Math.max(0, G.cash - 5);
+        event._dynamicDesc = 'Inspector Davis found no inventory to confiscate, but fined you $5 for incomplete records. Even without product on hand, businesses must maintain proper documentation.';
+      }
+      break;
+    }
+    case 'compliance_warn': G.complianceWarning = true; break;
+    case 'day_lost_fine': G.cash = Math.max(0, G.cash - event.value); advanceDay(true); break;
+    case 'drop_sell': G.activeEffects.drop_sell = event.value; generatePrices(); break;
+    case 'raise_buy': G.activeEffects.raise_buy = event.value; generatePrices(); break;
+    case 'storm': {
+      const invBefore = totalInventory();
+      const losses = [];
+      if (invBefore > 0) {
+        Object.keys(G.inventory).forEach(k => {
+          const loss = Math.floor(G.inventory[k] * event.value);
+          if (loss > 0) {
+            const prod = PRODUCTS.find(p => p.id === k);
+            losses.push(`${loss} ${prod ? prod.name : k}`);
+            G.inventory[k] -= loss;
+          }
+        });
+        const lossStr = losses.join(', ');
+        event._dynamicDesc = `A storm hit! This is an example of an external risk \u2014 an event outside your control that disrupts your business. You lost: ${lossStr}. You also can\u2019t sell today.`;
+      } else {
+        event._dynamicDesc = 'A storm hit! This is an example of an external risk \u2014 an event outside your control. You couldn\u2019t set up shop today \u2014 the day is lost.';
+      }
+      G.soldToday = true;
+      G.hasSoldThisTurn = true;
+      break;
+    }
+    case 'cold_snap': G.activeEffects.cold_snap = true; generatePrices(); break;
+    case 'global_buy_up': G.activeEffects.global_buy_up = event.value; generatePrices(); break;
+  }
+  const desc = event._dynamicDesc || event.desc;
+  return { type:event.effect, title:event.name, desc, emoji:ant.emoji, tip:event.tip, antName:ant.name };
+}
+
+// ===== WAGON UPGRADE CHECK =====
+function checkWagonUpgrade() {
+  const upgrades = WAGON_UPGRADES[G.mode] || WAGON_UPGRADES.starter;
+  if (G.wagonUpgradeIndex >= upgrades.length) return null;
+  const upgrade = upgrades[G.wagonUpgradeIndex];
+  if (G.netWorth >= upgrade.threshold && G.day >= upgrade.minDay) return upgrade;
+  return null;
+}
+
+// ===== DAY MANAGEMENT =====
+function advanceDay(skipEvent) {
+  G.day++;
+  G.soldToday = false;
+  G.hasSoldThisTurn = false;
+  G.boughtHere = false;
+  G.arrivedViaTravel = G._willArrive || false;
+  G._willArrive = false;
+  G.activeEffects = {};
+  if (G.day > G.days) { endGame(); return; }
+  generatePrices();
+  updateAdaptive();
+  updateNetWorth();
+  const newProds = checkNewUnlocks();
+  if (!skipEvent) {
+    const event = rollForEvent();
+    if (event) { G.lastEvent = event; }
+    else if (newProds) { G.lastEvent = { type:'unlock', title:'New Product Available!', desc:`${newProds.map(p=>p.emoji+' '+p.name).join(', ')} just entered your market! A wider product mix gives you more ways to earn \u2014 that\u2019s called diversification.`, emoji:'\uD83C\uDF89', tip:'Diversification means spreading your investments across different products. If one product\u2019s price drops, others can still be profitable.' }; }
+    else { G.lastEvent = null; }
+  }
+  // Saturation warning
+  if (G.daysAtLocation >= 3 && !G.lastEvent) {
+    G.lastEvent = { type:'saturation', title:'Market Saturated!', desc:`You\u2019ve been in ${NEIGHBORHOODS[G.location].name} for ${G.daysAtLocation} days. This is called market saturation \u2014 when there\u2019s too much supply in one place, prices drop. Your sell prices here are falling!`, emoji:'\uD83D\uDCC9', tip:'Market saturation is a signal to move. Smart business owners find new markets before profits disappear.' };
+  }
+  render();
+  if (G.lastEvent) showModal(G.lastEvent);
+}
+
+function updateNetWorth() {
+  let invValue = 0;
+  const loc = NEIGHBORHOODS[G.location].id;
+  PRODUCTS.forEach(p => {
+    if (G.inventory[p.id] > 0 && G.prices[loc] && G.prices[loc][p.id]) {
+      invValue += G.inventory[p.id] * G.prices[loc][p.id].sell;
+    }
+  });
+  G.netWorth = Math.round((G.cash + invValue) * 100) / 100;
+  G.netWorthHistory.push(G.netWorth);
+}
+
+// ===== ACTIONS =====
+function buyProduct(productId, qty) {
+  const loc = NEIGHBORHOODS[G.location].id;
+  const price = G.prices[loc][productId].buy;
+  const cost = price * qty;
+  if (cost > G.cash || qty > wagonFree()) return;
+  G.cash = Math.round((G.cash - cost)*100)/100;
+  // Update average buy price using weighted average
+  const prevQty = G.inventory[productId];
+  const prevAvg = G.avgBuyPrice[productId] || 0;
+  G.avgBuyPrice[productId] = prevQty + qty > 0 ? ((prevAvg * prevQty) + (price * qty)) / (prevQty + qty) : price;
+  G.inventory[productId] += qty;
+  G.buyHistory.push({ product:productId, qty, price, day:G.day });
+  G.productsBought[productId] = (G.productsBought[productId] || 0) + qty;
+  if (G.mode === 'full') G.boughtHere = true;
+  updateNetWorth();
+  render();
+  if (!checkAdvisorTutorial()) checkAdvisorContextual();
+}
+
+function sellProduct(productId, qty) {
+  if (G.soldToday || qty <= 0 || G.inventory[productId] < qty) return;
+  // Full Market: hard guard — must have traveled to sell
+  if (G.mode === 'full' && !G.arrivedViaTravel) return;
+  const loc = NEIGHBORHOODS[G.location].id;
+  const price = G.prices[loc][productId].sell;
+  const revenue = price * qty;
+  G.cash = Math.round((G.cash + revenue)*100)/100;
+  G.inventory[productId] -= qty;
+  G.totalRevenue += revenue;
+  // Calculate profit/loss using tracked average buy price
+  const avgCost = G.avgBuyPrice[productId] || 0;
+  const profit = (price - avgCost) * qty;
+  G.totalProfit += profit;
+  // Detect loss
+  const isLoss = price < avgCost;
+  if (isLoss) {
+    G.lossCount++;
+    G.lossTotalUnits += qty;
+    if (G.isCareer) G.profitStreak = 0; // reset streak on loss
+  } else if (G.isCareer) {
+    G.profitStreak++;
+    if (G.profitStreak > G.bestProfitStreak) G.bestProfitStreak = G.profitStreak;
+  }
+  G.sellHistory.push({ product:productId, qty, price, day:G.day, avgCost, isLoss });
+  G.productsSold[productId] = (G.productsSold[productId] || 0) + qty;
+  G.hasSoldThisTurn = true;
+  updateNetWorth();
+  render();
+  // Show vocabulary-enriched loss popup
+  if (isLoss && !G.lossFirstSeen) {
+    G.lossFirstSeen = true;
+    const product = PRODUCTS.find(p => p.id === productId);
+    showModal({
+      type: 'loss_warning',
+      title: 'Negative Margin!',
+      desc: `You sold ${product.name} for $${price.toFixed(2)} each, but you paid an average of $${avgCost.toFixed(2)}. The difference between your buy price and sell price is called your profit margin \u2014 and yours just went negative. You lost $${Math.abs(profit).toFixed(2)} on that trade.`,
+      emoji: '\uD83D\uDCC9',
+      tip: 'In business, occasional losses happen. But consistent losses signal a problem. Smart owners track their margins and adjust their strategy.'
+    });
+  } else if (isLoss) {
+    // Subsequent losses: subtler banner (already visible in the sell history)
+  }
+  // Profit streak milestones (Career Mode only)
+  if (G.isCareer && !isLoss && (G.profitStreak === 5 || G.profitStreak === 10 || G.profitStreak === 20)) {
+    showModal({
+      type: 'streak', title: `${G.profitStreak}-Sale Streak! \uD83D\uDD25`,
+      desc: `You\u2019ve made ${G.profitStreak} profitable sales in a row without a single loss. That\u2019s consistency \u2014 one of the most important traits in business.`,
+      emoji: '\uD83C\uDFC6',
+      tip: G.profitStreak === 20 ? 'Twenty in a row. That\u2019s not luck \u2014 that\u2019s margin discipline.' : 'Keep it going! Consistent profits compound over time.'
+    });
+  }
+  // Advisor check after sale
+  if (!modalVisible) { if (!checkAdvisorTutorial()) checkAdvisorContextual(); }
+}
+
+function confirmDoneSelling() {
+  G.soldToday = true;
+  // If this is the last day, end the game automatically
+  if (G.day >= G.days) {
+    endGame();
+    return;
+  }
+  render();
+}
+
+function travel(destIndex) {
+  if (destIndex === G.location) return;
+  G.complianceWarning = false;
+  G.location = destIndex;
+  G.daysAtLocation = 1;
+  G.travelCount++;
+  const locId = NEIGHBORHOODS[destIndex].id;
+  G.locationsVisited[locId] = (G.locationsVisited[locId] || 0) + 1;
+  G._willArrive = true;
+  advanceDay();
+}
+
+function stayDay() {
+  G.daysAtLocation++;
+  G._willArrive = false;
+  advanceDay();
+}
+
+function buyTip() {
+  const cost = Math.random() < 0.5 ? 5 : 10;
+  if (G.cash < cost) return;
+  G.cash = Math.round((G.cash - cost)*100)/100;
+  G.tipSpend += cost;
+  G.tipCount++;
+  // Pick random non-current neighborhood
+  const others = NEIGHBORHOODS.filter((_,i) => i !== G.location);
+  const target = others[Math.floor(Math.random()*others.length)];
+  // Check if prices are above average
+  let totalSell = 0, count = 0;
+  const unlocked = getUnlocked();
+  unlocked.forEach(p => {
+    NEIGHBORHOODS.forEach(n => { totalSell += G.prices[n.id][p.id].sell; count++; });
+  });
+  const avgSell = totalSell / count;
+  let targetAvg = 0;
+  unlocked.forEach(p => { targetAvg += G.prices[target.id][p.id].sell; });
+  targetAvg /= unlocked.length;
+  const good = targetAvg > avgSell;
+  const tips = good
+    ? [`${target.emoji} ${target.name} looks promising right now! Demand seems strong there.`, `Word is ${target.name} has good demand today \u2014 customers are buying.`, `A friend says ${target.name} is busy today! Higher demand usually means higher prices.`]
+    : [`${target.emoji} ${target.name} seems quiet today. Low demand means lower sell prices.`, `I\u2019d avoid ${target.name} right now \u2014 the market there looks soft.`, `${target.name} doesn\u2019t look great for sales. Demand is down.`];
+  const tipText = tips[Math.floor(Math.random()*tips.length)];
+  const tipNote = G.tipCount === 1 ? 'Paying for information like this is called market research. It costs money but helps you make better decisions.' : null;
+  showModal({ type:'tip', title:`Market Research ($${cost})`, desc:tipText, emoji:'\uD83D\uDCA1', tip:tipNote });
+  updateNetWorth();
+  render();
+}
+
+function purchaseWagonUpgrade() {
+  const upgrades = WAGON_UPGRADES[G.mode] || WAGON_UPGRADES.starter;
+  const upgrade = upgrades[G.wagonUpgradeIndex];
+  if (!upgrade || G.cash < upgrade.cost) return;
+  G.cash = Math.round((G.cash - upgrade.cost)*100)/100;
+  G.wagonCapacity = upgrade.capacity;
+  G.wagonUpgradeIndex++;
+  updateNetWorth();
+  render();
+  showModal({ type:'upgrade', title:'Wagon Upgraded!', desc:`Your capacity is now ${G.wagonCapacity} slots! Spending money to increase your business\u2019s ability to operate is called a capital investment \u2014 you spent cash now to earn more later.`, emoji:'\uD83D\uDED2', tip:'Capital investment is one of the most important decisions in business. Every dollar spent on growth is a dollar not spent on inventory \u2014 that trade-off is called opportunity cost.' });
+}
+
+// ===== END GAME =====
+function endGame() {
+  G.gameOver = true;
+  updateNetWorth();
+  const pbKey = G.isCareer ? 'career_1_1' : G.mode;
+  if (G.netWorth > G.personalBest) {
+    G.personalBest = G.netWorth;
+    savePersonalBest(pbKey, G.netWorth);
+  }
+  render();
+}
+
+function beginCareerMode() {
+  const carryOver = {
+    cash: G.cash,
+    inventory: { ...G.inventory },
+    wagonCapacity: G.wagonCapacity,
+    wagonUpgradeIndex: G.wagonUpgradeIndex,
+    avgBuyPrice: { ...G.avgBuyPrice }
+  };
+  startCareerMode(carryOver);
+}
+
+function replayCareerSeason() {
+  const carryOver = {
+    cash: G.cash,
+    inventory: { ...G.inventory },
+    wagonCapacity: G.wagonCapacity,
+    wagonUpgradeIndex: G.wagonUpgradeIndex,
+    avgBuyPrice: { ...G.avgBuyPrice }
+  };
+  startCareerMode(carryOver);
+}
+
+function getGrade() {
+  const scores = calculateGradeFactors();
+  const composite = scores.composite;
+  if(composite>=90)return'A+';if(composite>=80)return'A';if(composite>=70)return'B+';
+  if(composite>=60)return'B';if(composite>=50)return'C+';if(composite>=40)return'C';
+  if(composite>=25)return'D';return'F';
+}
+
+function calculateGradeFactors() {
+  // === NET WORTH (40%) ===
+  // Net worth scoring: measure growth from starting position
+  const startingNW = G.netWorthHistory[0] || 50;
+  const growthTarget = G.mode === 'starter' ? 100 : 550; // Starter: grow by $100; Full/Career: grow by $550
+  const actualGrowth = G.netWorth - startingNW;
+  const nwScore = Math.min(100, Math.max(0, (actualGrowth / growthTarget) * 100));
+
+  // === MARGIN DISCIPLINE (25%) ===
+  const totalSales = G.sellHistory.length;
+  const profitableSales = G.sellHistory.filter(s => !s.isLoss).length;
+  const marginScore = totalSales > 0 ? (profitableSales / totalSales) * 100 : 50;
+
+  // === DIVERSIFICATION (15%) ===
+  const uniqueProductsSold = Object.keys(G.productsSold).length;
+  const maxProducts = G.mode === 'starter' ? Math.min(6, G.unlocked.length) : 6;
+  const divRatio = maxProducts > 0 ? uniqueProductsSold / maxProducts : 0;
+  const divScore = divRatio >= 0.8 ? 100 : divRatio >= 0.6 ? 80 : divRatio >= 0.4 ? 60 : divRatio >= 0.2 ? 40 : 20;
+
+  // === MARKET RESEARCH (12%) ===
+  let researchScore;
+  const idealTips = G.mode === 'starter' ? 4 : 6;
+  if (G.tipCount === 0) researchScore = 15;
+  else if (G.tipCount <= idealTips * 0.5) researchScore = 55;
+  else if (G.tipCount <= idealTips * 1.5) researchScore = 100;
+  else researchScore = 75; // overspending on research
+
+  // === TRAVEL / MARKET ACCESS (8%) ===
+  const uniqueLocations = Object.keys(G.locationsVisited).length;
+  const travelScore = uniqueLocations >= 4 ? 100 : uniqueLocations >= 3 ? 80 : uniqueLocations >= 2 ? 50 : 20;
+
+  // === COMPOSITE ===
+  const composite = Math.round(
+    (nwScore * 0.40) +
+    (marginScore * 0.25) +
+    (divScore * 0.15) +
+    (researchScore * 0.12) +
+    (travelScore * 0.08)
+  );
+
+  return { composite, nwScore: Math.round(nwScore), marginScore: Math.round(marginScore), divScore: Math.round(divScore), researchScore: Math.round(researchScore), travelScore: Math.round(travelScore) };
+}
+
+function getGradeExplanation(scores) {
+  const strengths = [];
+  const improvements = [];
+
+  if (scores.nwScore >= 70) strengths.push('Strong net worth growth \u2014 your business generated real profit.');
+  else if (scores.nwScore >= 40) strengths.push('Decent net worth growth, but there\u2019s room to earn more.');
+  else improvements.push('Your net worth stayed low. Focus on finding bigger price differences between neighborhoods.');
+
+  if (scores.marginScore >= 90) strengths.push('Excellent margin discipline \u2014 almost every sale was profitable.');
+  else if (scores.marginScore >= 70) strengths.push('Good margin awareness \u2014 most of your sales were profitable.');
+  else improvements.push('Too many sales at a loss. Check the sell prices before committing \u2014 protect your profit margins.');
+
+  if (scores.divScore >= 80) strengths.push('Great diversification \u2014 you traded multiple product types, spreading your risk.');
+  else if (scores.divScore >= 50) {} // middle ground, skip
+  else improvements.push('Try trading more product types. Diversification protects you when one product\u2019s price drops.');
+
+  if (scores.researchScore >= 80) strengths.push('Smart use of market research \u2014 paying for information helped guide your decisions.');
+  else if (scores.researchScore <= 20) improvements.push('You never bought market research. Spending a little on information can lead to much better trades.');
+
+  if (scores.travelScore >= 80) strengths.push('Great market access \u2014 you explored multiple neighborhoods to find the best deals.');
+  else if (scores.travelScore <= 30) improvements.push('Try visiting more neighborhoods. Different markets have different prices \u2014 that\u2019s where opportunity lives.');
+
+  // Build text
+  let text = '';
+  if (strengths.length > 0) text += strengths.slice(0, 2).join(' ');
+  if (improvements.length > 0) text += (text ? ' ' : '') + improvements[0];
+  return text;
+}
+
+// ===== ADVISOR: MAEVE =====
+let advisorState = { tutorialStep: 0, shownTips: {} };
+
+function showAdvisor(message, buttonText, onClose) {
+  modalVisible = true;
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `<div class="advisor-modal">
+    <div class="advisor-header">
+      <div class="advisor-avatar">\uD83D\uDC69\u200D\uD83D\uDCBC</div>
+      <div>
+        <div class="advisor-name">Maeve</div>
+        <div class="advisor-title">Your Business Advisor</div>
+      </div>
+    </div>
+    <div class="advisor-body">${message}</div>
+    <div class="modal-buttons">
+      <button class="btn btn-primary btn-lg" id="advisorBtn">${buttonText || 'Got it!'}</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  document.getElementById('advisorBtn').onclick = function() {
+    overlay.remove();
+    modalVisible = false;
+    if (onClose) onClose();
+    else render();
+  };
+}
+
+function checkAdvisorTutorial() {
+  if (!G || G.gameOver) return;
+  const step = advisorState.tutorialStep;
+
+  // Step 0: Welcome — shown right after game starts (day 1, before any action)
+  if (step === 0 && G.day === 1 && !G.hasSoldThisTurn && !G.soldToday && G.sellHistory.length === 0 && G.buyHistory.length === 0) {
+    advisorState.tutorialStep = 1;
+    const bizName = playerInfo.businessName || 'your business';
+    showAdvisor(
+      `Welcome to <strong>${bizName}</strong>! I\u2019m Maeve, and I\u2019ll be your business advisor.\n\nYou\u2019re starting with <strong>$50 in cash</strong> and a <strong>wagon that holds 50 items</strong>. Your goal is to buy products at low prices and sell them at higher prices to grow your business.\n\nLet\u2019s start with your first purchase. Click the <strong>Buy tab</strong> and buy some lemonade. Pay attention to the price \u2014 you\u2019ll want to sell it for more than you paid!`.replace(/\n/g, '<br>'),
+      'Let\u2019s get started!'
+    );
+    return true;
+  }
+
+  // Step 1: After first purchase
+  if (step === 1 && G.buyHistory.length > 0 && G.sellHistory.length === 0) {
+    advisorState.tutorialStep = 2;
+    const lastBuy = G.buyHistory[G.buyHistory.length - 1];
+    const prodName = PRODUCTS.find(p => p.id === lastBuy.product)?.name || 'that product';
+    if (G.mode === 'starter') {
+      showAdvisor(
+        `Nice! You bought ${prodName} at <strong>$${lastBuy.price.toFixed(2)} each</strong>. That\u2019s your <strong>cost</strong>.\n\nNow go to the <strong>Sell tab</strong> and sell it. Look at the sell price \u2014 if it\u2019s higher than what you paid, you\u2019ll make a <strong>profit</strong>. If it\u2019s lower, you\u2019ll take a <strong>loss</strong>. The difference is called your <strong>profit margin</strong>.`.replace(/\n/g, '<br>'),
+        'Show me the Sell tab'
+      );
+    } else {
+      showAdvisor(
+        `Nice! You bought ${prodName} at <strong>$${lastBuy.price.toFixed(2)} each</strong>. That\u2019s your <strong>cost</strong>.\n\nIn Full Market Mode, you can\u2019t sell where you bought. You need to <strong>travel to a different neighborhood</strong> first. Check the <strong>Travel tab</strong> \u2014 each neighborhood has different prices. That\u2019s where the opportunity is!`.replace(/\n/g, '<br>'),
+        'Show me the Travel tab'
+      );
+    }
+    return true;
+  }
+
+  // Step 2: After first sale
+  if (step === 2 && G.sellHistory.length > 0 && G.sellHistory.length <= 2) {
+    advisorState.tutorialStep = 3;
+    const lastSell = G.sellHistory[G.sellHistory.length - 1];
+    const avgCost = lastSell.avgCost || 0;
+    const margin = avgCost > 0 ? Math.round(((lastSell.price - avgCost) / avgCost) * 100) : 0;
+    const profitable = lastSell.price > avgCost;
+    const nextStepStarter = 'When you\u2019re done selling, click <strong>Done Selling</strong>. Then head to the <strong>Travel tab</strong> to move to a new neighborhood. Once you arrive, you\u2019ll be able to buy and sell again. Each neighborhood has different prices \u2014 that\u2019s where the opportunity is!';
+    const nextStepFull = 'When you\u2019re done selling, click <strong>Done Selling</strong>. Then you can buy new stock on the <strong>Buy tab</strong> before traveling to the next neighborhood.';
+    const nextStep = G.mode === 'starter' ? nextStepStarter : nextStepFull;
+    showAdvisor(
+      profitable
+        ? ('You sold at <strong>$' + lastSell.price.toFixed(2) + '</strong> \u2014 that\u2019s a <strong>' + margin + '% profit margin</strong>! You\u2019re already thinking like a business owner.<br><br>' + nextStep + '<br><br>I\u2019ll check in from time to time, but you\u2019ve got the basics. Go make some money!')
+        : ('You sold at <strong>$' + lastSell.price.toFixed(2) + '</strong>, but you paid <strong>$' + avgCost.toFixed(2) + '</strong> \u2014 that\u2019s a <strong>negative margin</strong>. You lost money on that trade.<br><br>Don\u2019t worry \u2014 it happens. The key is to check prices before you sell. ' + nextStep),
+      'I\u2019ve got this!'
+    );
+    return true;
+  }
+
+  return false;
+}
+
+function checkAdvisorContextual() {
+  if (!G || G.gameOver || advisorState.tutorialStep < 3) return false;
+
+  // First saturation
+  if (G.daysAtLocation === 3 && !advisorState.shownTips.saturation) {
+    advisorState.shownTips.saturation = true;
+    showAdvisor(
+      `You\u2019ve been in ${NEIGHBORHOODS[G.location].name} for 3 days now. Notice your sell prices are dropping? That\u2019s called <strong>market saturation</strong> \u2014 when you stay too long in one place, supply exceeds demand and prices fall.\n\nTime to move! Different neighborhoods are always looking for what you\u2019re selling.`.replace(/\n/g, '<br>'),
+      'Time to move!'
+    );
+    return true;
+  }
+
+  // First wagon upgrade available
+  if (!advisorState.shownTips.upgrade) {
+    const upgrades = WAGON_UPGRADES[G.mode] || WAGON_UPGRADES.starter;
+    const upgrade = upgrades[G.wagonUpgradeIndex];
+    if (upgrade && G.netWorth >= upgrade.threshold && G.day >= upgrade.minDay) {
+      advisorState.shownTips.upgrade = true;
+      showAdvisor(
+        `Your business is growing! You\u2019ve unlocked a <strong>wagon upgrade</strong> \u2014 more space means you can carry more products and earn more per trip.\n\nBut here\u2019s the trade-off: the upgrade costs <strong>$${upgrade.cost}</strong>. That\u2019s cash you could spend on inventory instead. In business, this decision is called a <strong>capital investment</strong> \u2014 spending money now to earn more later.`.replace(/\n/g, '<br>'),
+        'Interesting!'
+      );
+      return true;
+    }
+  }
+
+  // Tip reminder on day 4 if never bought a tip
+  if (G.day === 4 && G.tipCount === 0 && !advisorState.shownTips.tipReminder) {
+    advisorState.shownTips.tipReminder = true;
+    showAdvisor(
+      'Quick tip: see the <strong>Market Research</strong> button on the Travel tab? For a small fee, I can find out which neighborhoods have good prices right now.<br><br>It\u2019s not a guarantee \u2014 but paying for information before making a big decision is called <strong>market research</strong>, and it\u2019s one of the smartest investments you can make.',
+      'Good to know!'
+    );
+    return true;
+  }
+
+  // Revenue vs Profit explanation after 3+ sales
+  if (G.sellHistory.length >= 3 && !advisorState.shownTips.revenueProfit) {
+    advisorState.shownTips.revenueProfit = true;
+    const rev = G.totalRevenue.toFixed(2);
+    const startNW = G.netWorthHistory[0] || 50;
+    const profit = (G.netWorth - startNW).toFixed(2);
+    showAdvisor(
+      'Let me explain something important. Your <strong>revenue</strong> is $' + rev + ' \u2014 that\u2019s the total money that came in from sales. But revenue is NOT the same as profit.<br><br>Your <strong>profit</strong> is $' + profit + ' \u2014 that\u2019s what\u2019s left after subtracting what you paid for the products. A business can have high revenue and still make very little profit if their costs are too high.',
+      'That makes sense!'
+    );
+    return true;
+  }
+
+  // Opportunity cost explanation when wagon is more than 70% full
+  if (wagonPercent() > 70 && !advisorState.shownTips.opportunityCost && G.day >= 3) {
+    advisorState.shownTips.opportunityCost = true;
+    showAdvisor(
+      'Your wagon is getting full! Every item you put in takes a slot that could go to something else. If you fill up on lemonade, you can\u2019t carry toys \u2014 and toys might have a bigger profit margin.<br><br>This trade-off is called <strong>opportunity cost</strong> \u2014 what you give up when you choose one option over another. Smart business owners think about what they\u2019re saying \u201Cno\u201D to every time they say \u201Cyes.\u201D',
+      'I\u2019ll choose wisely!'
+    );
+    return true;
+  }
+
+  return false;
+}
+
+// ===== TERMS OF SERVICE =====
+function showTOS() {
+  modalVisible = true;
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `<div class="modal" style="max-width:420px">
+    <h2>Terms of Service</h2>
+    <div class="tos-modal-body">
+      <h3>1. Acceptance of Terms</h3>
+      <p>By accessing and using this application (\u201CFrom Pencils to Pixels\u201D), you agree to be bound by these Terms of Service. If you are under 18 years of age, your parent or guardian must agree to these terms on your behalf.</p>
+
+      <h3>2. Description of Service</h3>
+      <p>From Pencils to Pixels is an educational business simulation game designed to teach financial literacy concepts. The game is provided for educational and entertainment purposes only and does not constitute financial advice.</p>
+
+      <h3>3. Intellectual Property</h3>
+      <p>All content, design, code, game mechanics, characters, text, graphics, and other materials in this application are the exclusive intellectual property of [Owner Name] and are protected by applicable copyright, trademark, and other intellectual property laws. No part of this application may be reproduced, distributed, modified, reverse-engineered, or used for any commercial purpose without prior written permission.</p>
+
+      <h3>4. User Conduct</h3>
+      <p>You agree to use this application only for its intended educational purpose. You may not attempt to copy, modify, distribute, sell, or create derivative works based on this application or any of its content.</p>
+
+      <h3>5. Data and Privacy</h3>
+      <p>This application stores game progress data locally on your device using browser storage. No personal information is collected, transmitted, or stored on external servers. Player names entered in the game are stored only on the local device.</p>
+
+      <h3>6. Disclaimer of Warranties</h3>
+      <p>This application is provided \u201Cas is\u201D without warranties of any kind. The developer does not guarantee uninterrupted or error-free operation. Educational content is designed for general financial literacy instruction and should not be relied upon as professional financial advice.</p>
+
+      <h3>7. Limitation of Liability</h3>
+      <p>In no event shall [Owner Name] be liable for any damages arising from the use or inability to use this application.</p>
+
+      <h3>8. Changes to Terms</h3>
+      <p>These terms may be updated from time to time. Continued use of the application following any changes constitutes acceptance of the revised terms.</p>
+
+      <h3>9. Contact</h3>
+      <p>For questions about these terms, please contact [Contact Email].</p>
+    </div>
+    <button class="btn btn-primary" onclick="this.closest('.modal-overlay').remove();modalVisible=false;">Close</button>
+  </div>`;
+  document.body.appendChild(overlay);
+}
+
+// ===== MODAL =====
+let modalVisible = false;
+function showModal(event) {
+  modalVisible = true;
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `<div class="modal">
+    <div style="font-size:2.2rem;margin-bottom:6px">${event.emoji}</div>
+    <h2>${event.title}</h2>
+    <p>${event.desc}</p>
+    ${event.tip ? `<div class="tip-text">💡 ${event.tip}</div>` : ''}
+    <div class="modal-buttons" style="margin-top:12px">
+      <button class="btn btn-primary btn-lg" onclick="this.closest('.modal-overlay').remove();modalVisible=false;render();">Got it!</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+}
+
+// ===== RENDER ENGINE =====
+function render() {
+  const app = document.getElementById('app');
+  if (!G.day) { renderStart(app); return; }
+  if (G.gameOver) { renderEnd(app); return; }
+  const loc = NEIGHBORHOODS[G.location];
+  const unlocked = getUnlocked();
+  const wPct = wagonPercent();
+  const wClass = wPct > 90 ? 'full' : wPct > 70 ? 'warning' : '';
+  const upgrade = checkWagonUpgrade();
+  
+  app.innerHTML = `
+    <h1>${playerInfo.businessName || 'From Pencils to Pixels'}</h1>
+    <div class="status-bar">
+      <div class="stat"><span class="stat-label">Cash</span><span class="stat-value">$${G.cash.toFixed(2)}</span></div>
+      <div class="stat"><span class="stat-label">Net Worth</span><span class="stat-value">$${G.netWorth.toFixed(2)}</span></div>
+      <div class="location-row" style="font-size:.65rem;opacity:.7;border-top:none;padding-top:0">Cash = money on hand \u2022 Net Worth = cash + value of your inventory</div>
+      <div class="stat"><span class="stat-label">Day</span><span class="stat-value">${G.day} / ${G.days}</span></div>
+      <div class="stat"><span class="stat-label">Wagon</span><span class="stat-value">${totalInventory()} / ${G.wagonCapacity}</span></div>
+      <div class="location-row">${loc.emoji} ${loc.name}</div>
+    </div>
+    <div class="wagon-bar"><div class="wagon-fill ${wClass}" style="width:${Math.min(wPct,100)}%"></div></div>
+    ${G.complianceWarning ? '<div class="banner banner-danger">\u26A0\uFE0F Inspector Davis warned you \u2014 move today or pay $10!</div>' : ''}
+    ${G.mode === 'full' && !G.arrivedViaTravel && !G.soldToday && totalInventory() > 0 ? '<div class="banner banner-warn">\uD83D\uDCE6 You have inventory. Travel to a new neighborhood to sell!</div>' : ''}
+    ${G.mode === 'full' && G.arrivedViaTravel && !G.hasSoldThisTurn && !G.soldToday && totalInventory() > 0 ? '<div class="banner banner-info">\uD83D\uDCE6 You arrived with inventory! You can buy more or start selling.</div>' : ''}
+    ${G.hasSoldThisTurn && !G.soldToday && totalInventory() > 0 ? '<div class="banner banner-info">\uD83D\uDCBC Selling in progress \u2014 finish up, then click Done Selling.</div>' : ''}
+    ${G.hasSoldThisTurn && !G.soldToday && totalInventory() === 0 ? '<div class="banner banner-info">\uD83D\uDCBC All sold! Click Done Selling on the Sell tab.</div>' : ''}
+    ${G.soldToday && G.mode === 'full' && !G.boughtHere ? '<div class="banner banner-warn">\u2705 Done selling. Buy new stock on the Buy tab, then Travel.</div>' : ''}
+    ${G.soldToday && G.mode === 'full' && G.boughtHere ? '<div class="banner banner-info">\uD83D\uDE97 Stocked up! Travel to a new neighborhood to sell.</div>' : ''}
+    ${G.soldToday && G.mode === 'starter' ? '<div class="banner banner-warn">\u2705 Done selling. Travel or Stay to advance.</div>' : ''}
+    ${G.daysAtLocation >= 3 ? `<div class="banner banner-warn">\uD83D\uDCC9 Market saturation: ${G.daysAtLocation} days here. Too much supply \u2014 sell prices dropping!</div>` : ''}
+    ${upgrade && !G.soldToday ? `<div class="upgrade-card"><h3>\uD83D\uDED2 Capital Investment Opportunity!</h3><p class="text-muted">${upgrade.label}: ${G.wagonCapacity} \u2192 ${upgrade.capacity} slots capacity</p><button class="btn btn-sell" onclick="purchaseWagonUpgrade()" ${G.cash < upgrade.cost ? 'disabled' : ''}>Invest $${upgrade.cost}</button></div>` : ''}
+    ${G.mode === 'starter' ? renderProgressTrack(unlocked) : ''}
+    <div class="tabs">
+      ${['buy','sell','travel','inventory','stats'].map(t => `<div class="tab ${G.activeTab===t?'active':''}" onclick="G.activeTab='${t}';render()">${t.charAt(0).toUpperCase()+t.slice(1)}</div>`).join('')}
+    </div>
+    <div class="tab-content">${renderTab(unlocked)}</div>
+  `;
+}
+
+function renderProgressTrack(unlocked) {
+  return `<div class="progress-track">${PRODUCTS.map(p => {
+    const isUnlocked = unlocked.some(u=>u.id===p.id);
+    const isCurrent = p.unlockDay === G.day;
+    return `<div class="progress-dot ${isUnlocked?'unlocked':''} ${isCurrent?'current':''}" title="${p.emoji} ${p.name}${isUnlocked?' (unlocked)':` (Day ${p.unlockDay})`}"></div>`;
+  }).join('')}</div>`;
+}
+
+function renderTab(unlocked) {
+  switch(G.activeTab) {
+    case 'buy': return renderBuyTab(unlocked);
+    case 'sell': return renderSellTab(unlocked);
+    case 'travel': return renderTravelTab();
+    case 'inventory': return renderItemsTab();
+    case 'stats': return renderStatsTab();
+  }
+}
+
+function renderBuyTab(unlocked) {
+  // Starter Mode: lock buying after any sale
+  if (G.mode === 'starter' && (G.hasSoldThisTurn || G.soldToday)) {
+    return '<div class="text-center mt-2"><h3>\uD83D\uDD12 Buying locked</h3><p class="text-muted mt-2">You\'ve already sold today. Travel or Stay Another Day to buy again tomorrow.</p></div>';
+  }
+  // Full Market Mode: lock buying while actively selling (between first sale and Done Selling)
+  // But reopen after Done Selling so player can restock before traveling
+  if (G.mode === 'full' && G.hasSoldThisTurn && !G.soldToday) {
+    return '<div class="text-center mt-2"><h3>\uD83D\uDD12 Finish selling first</h3><p class="text-muted mt-2">Click "Done Selling" on the Sell tab. Then you can buy new stock before traveling.</p></div>';
+  }
+  const loc = NEIGHBORHOODS[G.location].id;
+  const free = wagonFree();
+  let html = '';
+  html += `<div class="banner" style="background:#f5ede0;color:#6b5b4a;border:1px solid #e0d6c2;font-size:.72rem">\uD83D\uDED2 Wagon space: ${free} of ${G.wagonCapacity} slots available</div>`;
+  html += unlocked.map(p => {
+    const price = G.prices[loc][p.id].buy;
+    const maxAfford = Math.floor(G.cash / price);
+    const maxBuy = Math.min(maxAfford, free);
+    return `<div class="card">
+      <div class="card-header">
+        <span class="card-title">${p.emoji} ${p.name}</span>
+        <span class="price">$${price.toFixed(2)}</span>
+      </div>
+      <div class="flex-between">
+        <span class="text-muted">Can buy: ${maxBuy} ${maxBuy < maxAfford ? '(wagon full)' : maxBuy < free ? '(limited by cash)' : ''}</span>
+        <div>
+          <button class="btn btn-primary btn-sm" onclick="buyProduct('${p.id}',1)" ${maxBuy<1?'disabled':''}>+1</button>
+          <button class="btn btn-primary btn-sm" onclick="buyProduct('${p.id}',5)" ${maxBuy<5?'disabled':''}>+5</button>
+          <button class="btn btn-primary btn-sm" onclick="buyProduct('${p.id}',10)" ${maxBuy<10?'disabled':''}>+10</button>
+          <button class="btn btn-primary btn-sm" onclick="buyProduct('${p.id}',${maxBuy})" ${maxBuy<1?'disabled':''}>All</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+  return html;
+}
+
+function renderSellTab(unlocked) {
+  // Already confirmed done selling
+  if (G.soldToday) {
+    if (G.mode === 'full') {
+      return '<div class="text-center mt-2"><h3>\u2705 Done selling for today</h3><p class="text-muted mt-2">Travel to a new neighborhood to buy and sell again.</p></div>';
+    }
+    return '<div class="text-center mt-2"><h3>\u2705 Done selling for today</h3><p class="text-muted mt-2">Travel to a new neighborhood or Stay Another Day to continue.</p></div>';
+  }
+  // Full Market Mode: must have traveled to sell
+  if (G.mode === 'full' && !G.arrivedViaTravel) {
+    const hasInv = totalInventory() > 0;
+    if (!hasInv) return '<div class="text-center mt-2"><h3>No inventory to sell</h3><p class="text-muted mt-2">Buy products on the Buy tab, then travel to a new neighborhood to sell them.</p></div>';
+    return '<div class="text-center mt-2"><h3>\uD83D\uDD12 Must travel to sell</h3><p class="text-muted mt-2">You can\'t sell where you bought. Travel to a different neighborhood first!</p><p class="text-muted" style="margin-top:8px">\uD83D\uDCA1 Use Market Research on the Travel tab to find out where prices are good.</p></div>';
+  }
+  const loc = NEIGHBORHOODS[G.location].id;
+  const hasInv = unlocked.some(p => G.inventory[p.id] > 0);
+  if (!hasInv && !G.hasSoldThisTurn) return '<div class="text-center mt-2"><h3>No inventory to sell</h3><p class="text-muted mt-2">Visit the Buy tab to stock up!</p></div>';
+  if (!hasInv && G.hasSoldThisTurn) return `<div class="text-center mt-2"><h3>All sold! \uD83C\uDF89</h3><p class="text-muted mt-2">${G.day >= G.days ? 'Final day! Confirm to see your market report.' : 'You\'ve sold everything. Confirm you\'re done, then travel.'}</p><button class="btn btn-primary btn-lg" style="width:100%;margin-top:10px" onclick="confirmDoneSelling()">${G.day >= G.days ? '\uD83D\uDCCA Close the Books' : '\u2705 Done Selling for Today'}</button></div>`;
+  let html = '';
+  if (!G.hasSoldThisTurn) html += '<div class="banner" style="background:#f5ede0;color:#6b5b4a;border:1px solid #e0d6c2;font-size:.72rem">\uD83D\uDCCB You get one selling session per day. Sell as many product types as you want, then click Done Selling.</div>';
+  if (G.hasSoldThisTurn) html += '<div class="banner banner-info">You can sell more products, or click Done Selling when finished.</div>';
+  html += unlocked.filter(p => G.inventory[p.id] > 0).map(p => {
+    const price = G.prices[loc][p.id].sell;
+    const qty = G.inventory[p.id];
+    const avgCost = G.avgBuyPrice[p.id] || 0;
+    const isLoss = avgCost > 0 && price < avgCost;
+    const marginPct = avgCost > 0 ? Math.round(((price - avgCost) / avgCost) * 100) : 0;
+    return `<div class="card" ${isLoss ? 'style="border-left:3px solid #b83a2a"' : ''}>
+      <div class="card-header">
+        <span class="card-title">${p.emoji} ${p.name} (${qty})</span>
+        <span class="price sell">$${price.toFixed(2)}</span>
+      </div>
+      <div class="flex-between" style="margin-bottom:4px">
+        <span class="text-muted" style="font-size:.72rem">Avg cost: $${avgCost.toFixed(2)} \u2022 Margin: <span style="color:${isLoss?'#b83a2a':'#5a7a4a'};font-weight:700">${marginPct}%</span></span>
+        ${isLoss ? '<span style="color:#b83a2a;font-size:.72rem;font-weight:700">\u26A0\uFE0F Loss</span>' : ''}
+      </div>
+      <div style="display:flex;gap:4px;justify-content:flex-end">
+        <button class="btn btn-sell btn-sm" onclick="sellProduct('${p.id}',1)" ${qty<1?'disabled':''}>Sell 1</button>
+        <button class="btn btn-sell btn-sm" onclick="sellProduct('${p.id}',5)" ${qty<5?'disabled':''}>Sell 5</button>
+        <button class="btn btn-sell btn-sm" onclick="sellProduct('${p.id}',10)" ${qty<10?'disabled':''}>Sell 10</button>
+        <button class="btn btn-sell btn-sm" onclick="sellProduct('${p.id}',${qty})">Sell All</button>
+      </div>
+    </div>`;
+  }).join('');
+  if (G.hasSoldThisTurn) html += `<button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="confirmDoneSelling()">${G.day >= G.days ? '\uD83D\uDCCA Close the Books' : '\u2705 Done Selling for Today'}</button>`;
+  return html;
+}
+
+function renderTravelTab() {
+  let html = '<h3 class="mb-2">Neighborhoods</h3>';
+  if (G.mode === 'full' && totalInventory() > 0 && !G.arrivedViaTravel) {
+    html += '<div class="banner banner-info">📦 Travel to a new neighborhood to sell your inventory!</div>';
+  }
+  NEIGHBORHOODS.forEach((n, i) => {
+    const isCurrent = i === G.location;
+    html += `<div class="card">
+      <div class="card-header">
+        <span class="card-title">${n.emoji} ${n.name} ${isCurrent ? '📍' : ''}</span>
+        ${!isCurrent ? `<button class="btn btn-travel btn-sm" onclick="travel(${i})">Travel</button>` : '<span class="badge badge-new">You are here</span>'}
+      </div>
+      <p class="text-muted">${n.desc}</p>
+    </div>`;
+  });
+  html += `<div style="display:flex;gap:6px;margin-top:8px">
+    <button class="btn btn-travel" onclick="stayDay()" style="flex:1">Stay Another Day</button>
+    <button class="btn btn-tip" onclick="buyTip()" ${G.cash < 5 ? 'disabled' : ''}>Market Research \uD83D\uDCA1</button>
+  </div>`;
+  if (G.mode === 'full') html += '<p class="text-muted mt-2 text-center">⚠️ Staying lets you buy, but you must travel to sell.</p>';
+  if (G.tipCount > 0) html += `<p class="text-muted mt-2 text-center">Tips purchased: ${G.tipCount} ($${G.tipSpend} spent)</p>`;
+  return html;
+}
+
+function renderItemsTab() {
+  return `<div class="flex-between mb-2"><h3>Inventory</h3><span class="text-muted">${totalInventory()} / ${G.wagonCapacity} slots</span></div>
+  <div class="wagon-bar" style="margin-bottom:8px"><div class="wagon-fill ${wagonPercent()>90?'full':wagonPercent()>70?'warning':''}" style="width:${Math.min(wagonPercent(),100)}%"></div></div>
+  <div class="inv-grid">${PRODUCTS.filter(p => G.unlocked.includes(p.id)).map(p => `<div class="inv-item">
+    <div class="emoji">${p.emoji}</div>
+    <div class="name">${p.name}</div>
+    <div class="count">${G.inventory[p.id]}</div>
+  </div>`).join('')}</div>`;
+}
+
+function renderStatsTab() {
+  const pbDiff = G.netWorth - G.personalBest;
+  const pbClass = pbDiff >= 0 ? 'color:#5a7a4a' : 'color:#b83a2a';
+  const startingNW = G.netWorthHistory[0] || 50;
+  const totalProfit = G.netWorth - startingNW;
+  // Calculate average margin
+  let totalMarginWeighted = 0, totalSoldUnits = 0;
+  G.sellHistory.forEach(s => {
+    if (s.avgCost && s.avgCost > 0) {
+      const marginPct = ((s.price - s.avgCost) / s.avgCost) * 100;
+      totalMarginWeighted += marginPct * s.qty;
+      totalSoldUnits += s.qty;
+    }
+  });
+  const avgMargin = totalSoldUnits > 0 ? Math.round(totalMarginWeighted / totalSoldUnits) : 0;
+  return `${G.isCareer ? '<div class="banner banner-info" style="margin-bottom:8px">\uD83C\uDF1F Career Mode \u2022 Level ' + G.careerLevel + ': The Hustle</div>' : ''}
+  <h3>My Stats</h3>
+  <div class="end-stat"><span>Net Worth</span><span style="font-weight:800">$${G.netWorth.toFixed(2)}</span></div>
+  <div class="end-stat"><span>Cash on Hand</span><span>$${G.cash.toFixed(2)}</span></div>
+  <div class="end-stat"><span>Total Profit</span><span style="color:${totalProfit>=0?'#5a7a4a':'#b83a2a'};font-weight:700">${totalProfit>=0?'+':''}$${totalProfit.toFixed(2)}</span></div>
+  <div class="end-stat"><span>Total Revenue</span><span>$${G.totalRevenue.toFixed(2)}</span></div>
+  <div class="end-stat"><span>Avg Profit Margin</span><span style="color:${avgMargin>=0?'#5a7a4a':'#b83a2a'};font-weight:700">${avgMargin}%</span></div>
+  <div class="end-stat"><span>Sales at a Loss</span><span style="${G.lossCount>0?'color:#b83a2a':''}">${G.lossCount > 0 ? G.lossCount + ' (' + G.lossTotalUnits + ' units)' : 'None'}</span></div>
+  ${G.isCareer ? '<div class="end-stat"><span>Profit Streak</span><span style="font-weight:700">\uD83D\uDD25 ' + G.profitStreak + (G.bestProfitStreak > G.profitStreak ? ' (best: ' + G.bestProfitStreak + ')' : '') + '</span></div>' : ''}
+  <div class="end-stat"><span>Wagon</span><span>${totalInventory()} / ${G.wagonCapacity}</span></div>
+  <div class="end-stat"><span>Travels</span><span>${G.travelCount}</span></div>
+  <div class="end-stat"><span>Market Research</span><span>${G.tipCount} tips ($${G.tipSpend})</span></div>
+  <div class="end-stat"><span>Personal Best</span><span>$${G.personalBest.toFixed(2)}</span></div>
+  <div class="end-stat"><span>vs. Best</span><span style="${pbClass};font-weight:800">${pbDiff>=0?'+':''}$${pbDiff.toFixed(2)}</span></div>
+  <div class="chart-container"><canvas id="sparkline" height="120"></canvas></div>
+  ${G.encounters.length > 0 ? '<h3 class="mt-2">Encounters</h3>' + G.encounters.map(e => `<div class="encounter"><span class="emoji">${e.emoji}</span><span><strong>${e.name}</strong> \u2014 ${e.eventName} (Day ${e.day})</span></div>`).join('') : ''}`;
+}
+
+// ===== START SCREEN =====
+function renderStart(app) {
+  // If we don't have names yet, show name entry
+  if (!playerInfo.playerName || !playerInfo.businessName) {
+    app.innerHTML = `<div class="start-screen">
+      <h1>\uD83D\uDCD3 From Pencils to Pixels</h1>
+      <p class="subtitle">An Educational Business Simulation</p>
+      <div style="text-align:left;margin:20px 0">
+        <label class="name-label">\uD83D\uDC64 Your Name</label>
+        <input type="text" id="playerNameInput" class="name-input" placeholder="Enter your name" maxlength="30">
+        <div style="height:14px"></div>
+        <label class="name-label">\uD83C\uDFEA Your Business Name</label>
+        <input type="text" id="bizNameInput" class="name-input" placeholder="Name your business" maxlength="30">
+      </div>
+      <div class="tos-check">
+        <input type="checkbox" id="tosCheckbox">
+        <label for="tosCheckbox">I agree to the <span class="tos-link" onclick="event.preventDefault();showTOS()">Terms of Service</span></label>
+      </div>
+      <button class="btn btn-primary btn-lg" style="width:100%;margin-top:4px" onclick="submitNames()">Let\u2019s Go! \u2192</button>
+      <p class="text-muted" style="margin-top:10px;font-size:.7rem">Your name appears on your market report. Your business name appears during gameplay.</p>
+      <div class="copyright-footer">\u00A9 2026 [Owner Name]. All rights reserved.<br>From Pencils to Pixels\u2122 is a proprietary educational simulation.</div>
+    </div>`;
+    return;
+  }
+
+  // Names are set — show mode selection
+  const pbStarter = loadPersonalBest('starter');
+  const pbFull = loadPersonalBest('full');
+  app.innerHTML = `<div class="start-screen">
+    <h1>\uD83D\uDCD3 ${playerInfo.businessName}</h1>
+    <p class="subtitle">Owner: ${playerInfo.playerName}</p>
+    <p class="text-muted" style="margin:8px 0">Start with $50 in capital and a wagon (50 slots). Buy low, sell high, grow your business!</p>
+    <h2 style="margin-top:12px">Choose Your Mode</h2>
+    <div class="mode-card" onclick="startCalibration('starter')">
+      <h3>\uD83C\uDF31 Starter Mode</h3>
+      <div class="mode-detail"><span class="label">Duration:</span> 15 days</div>
+      <div class="mode-detail"><span class="label">Goal:</span> Grow your net worth and learn the basics</div>
+      <div class="mode-detail"><span class="label">How to play:</span></div>
+      <ul class="mode-list">
+        <li>Buy and sell goods like lemonade, cookies, and toys across 4 neighborhoods</li>
+        <li>You start with lemonade and unlock new products every few days</li>
+        <li>You can buy and sell in the same location</li>
+      </ul>
+      <p class="text-muted" style="font-size:.72rem;margin-top:4px">Best for ages 8\u201312 or anyone new to business games.</p>
+      ${pbStarter > 50 ? `<p class="text-muted" style="margin-top:4px">\uD83C\uDFC6 Personal Best: $${pbStarter.toFixed(2)}</p>` : ''}
+    </div>
+    <div class="mode-card" onclick="startCalibration('full')">
+      <h3>\uD83C\uDFEA Full Market Mode</h3>
+      <div class="mode-detail"><span class="label">Duration:</span> 30 days</div>
+      <div class="mode-detail"><span class="label">Goal:</span> Maximize profit and master the market</div>
+      <div class="mode-detail"><span class="label">How to play:</span></div>
+      <ul class="mode-list">
+        <li>All 6 products available from day 1</li>
+        <li>You must travel to a new neighborhood before you can sell</li>
+        <li>Every purchase is a bet \u2014 you won\u2019t know sell prices until you arrive</li>
+        <li>The market adapts to how you play</li>
+      </ul>
+      <p class="text-muted" style="font-size:.72rem;margin-top:4px">The full experience for experienced players, teachers, and classrooms.</p>
+      ${pbFull > 50 ? `<p class="text-muted" style="margin-top:4px">\uD83C\uDFC6 Personal Best: $${pbFull.toFixed(2)}</p>` : ''}
+    </div>
+    <p class="text-muted" style="margin-top:10px;font-size:.7rem;cursor:pointer;text-decoration:underline" onclick="playerInfo.playerName='';playerInfo.businessName='';render()">Change name / business</p>
+  </div>`;
+}
+
+function submitNames() {
+  const pName = (document.getElementById('playerNameInput') || {}).value || '';
+  const bName = (document.getElementById('bizNameInput') || {}).value || '';
+  const tosChecked = document.getElementById('tosCheckbox') && document.getElementById('tosCheckbox').checked;
+  if (!pName.trim() || !bName.trim()) {
+    alert('Please enter both your name and a business name.');
+    return;
+  }
+  if (!tosChecked) {
+    alert('Please read and accept the Terms of Service to continue.');
+    return;
+  }
+  playerInfo.playerName = pName.trim();
+  playerInfo.businessName = bName.trim();
+  render();
+}
+
+// ===== SKILL CALIBRATION =====
+function startCalibration(mode) {
+  if (mode === 'starter') {
+    // Starter Mode: skip calibration, go straight to game with Maeve's tutorial
+    advisorState = { tutorialStep: 0, shownTips: {} };
+    newGame('starter');
+    setTimeout(function() { checkAdvisorTutorial(); }, 100);
+    return;
+  }
+  // Full Market calibration - abstract scenario to set adaptive baseline
+  const app = document.getElementById('app');
+  app.innerHTML = `<div style="padding:12px">
+    <h1>📋 Quick Scenario</h1>
+    <p class="subtitle">This helps the game adjust to your experience level.</p>
+    <p style="font-size:.85rem;color:#6b5b4a;margin:10px 0;line-height:1.5">Imagine you're starting a business with limited cash. You see two types of products:</p>
+    <div style="display:flex;gap:8px;margin:10px 0 14px">
+      <div style="flex:1;background:#f0e8d4;border-left:3px solid #5a7a4a;padding:8px 10px;border-radius:0 6px 6px 0">
+        <div style="font-weight:800;font-size:.85rem;color:#5a7a4a">📦 Cheap Product</div>
+        <div style="font-size:.75rem;color:#7a6a58;margin-top:2px">Low cost, low profit per sale, fills your wagon fast</div>
+      </div>
+      <div style="flex:1;background:#f0e8d4;border-left:3px solid #b85c2a;padding:8px 10px;border-radius:0 6px 6px 0">
+        <div style="font-weight:800;font-size:.85rem;color:#b85c2a">💎 Expensive Product</div>
+        <div style="font-size:.75rem;color:#7a6a58;margin-top:2px">High cost, big profit per sale, fewer units fit</div>
+      </div>
+    </div>
+    <p class="text-muted" style="margin-bottom:6px;font-size:.75rem;text-align:center">Full Market: all 6 products \u2022 4 neighborhoods \u2022 30 days \u2022 must travel to sell</p>
+    <h3 style="margin:10px 0 8px">What\u2019s your approach?</h3>
+    <div class="mode-card" onclick="finishCalibration('full', 'lemonade_all')">
+      <h3>📦 Load up on the cheap stuff</h3>
+      <p>Volume over margin \u2014 sell lots of small items</p>
+    </div>
+    <div class="mode-card" onclick="finishCalibration('full', 'cookies_all')">
+      <h3>💎 Go for the expensive product</h3>
+      <p>Fewer units but bigger profit on each one</p>
+    </div>
+    <div class="mode-card" onclick="finishCalibration('full', 'mix')">
+      <h3>⚖️ Mix of both</h3>
+      <p>Don\u2019t put all your eggs in one basket</p>
+    </div>
+    <div class="mode-card" onclick="finishCalibration('full', 'save')">
+      <h3>💰 Buy some, keep cash in reserve</h3>
+      <p>Always keep a safety net for surprises</p>
+    </div>
+  </div>`;
+}
+
+function finishCalibration(mode, choice) {
+  let skill = 0;
+  if (choice === 'mix') skill = 0.3;
+  if (choice === 'save') skill = 0.5;
+  if (choice === 'cookies_all') skill = 0.2;
+  if (choice === 'lemonade_all') skill = 0.0;
+  advisorState = { tutorialStep: 0, shownTips: {} };
+  newGame(mode);
+  G.calSkill = skill;
+  G.adaptive.skillScore = skill;
+  G.adaptive.volatilityMult = 1.0 + (skill * 0.2);
+  setTimeout(function() { checkAdvisorTutorial(); }, 100);
+}
+
+// ===== END SCREEN =====
+function renderEnd(app) {
+  const grade = getGrade();
+  const scores = calculateGradeFactors();
+  const gradeExpl = getGradeExplanation(scores);
+  const gradeClass = grade.startsWith('A')?'grade-A':grade.startsWith('B')?'grade-B':grade.startsWith('C')?'grade-C':grade.startsWith('D')?'grade-D':'grade-F';
+  const lessons = generateLessons();
+  // Calculate margin stats
+  let totalMarginWeighted = 0, totalSoldUnits = 0;
+  G.sellHistory.forEach(s => {
+    if (s.avgCost && s.avgCost > 0) {
+      const marginPct = ((s.price - s.avgCost) / s.avgCost) * 100;
+      totalMarginWeighted += marginPct * s.qty;
+      totalSoldUnits += s.qty;
+    }
+  });
+  const avgMargin = totalSoldUnits > 0 ? Math.round(totalMarginWeighted / totalSoldUnits) : 0;
+  const startingNW = G.netWorthHistory[0] || 50;
+  const totalProfit = G.netWorth - startingNW;
+  // Antagonist summary
+  const antCounts = {};
+  G.encounters.forEach(e => {
+    const key = e.emoji + ' ' + e.name;
+    if (!antCounts[key]) antCounts[key] = { emoji:e.emoji, name:e.name, title:e.title, count:0 };
+    antCounts[key].count++;
+  });
+  // Grade bar helper
+  function bar(score) {
+    const color = score >= 70 ? '#5a7a4a' : score >= 40 ? '#b85c2a' : '#b83a2a';
+    return `<div style="display:flex;align-items:center;gap:6px"><div style="flex:1;background:#e0d6c2;border-radius:4px;height:8px;overflow:hidden"><div style="width:${score}%;height:100%;background:${color};border-radius:4px"></div></div><span style="font-size:.72rem;font-weight:700;color:${color};min-width:28px;text-align:right">${score}</span></div>`;
+  }
+  
+  app.innerHTML = `<div class="end-screen">
+    <h1>\uD83D\uDCD3 Month-End Market Report</h1>
+    ${playerInfo.businessName ? `<p style="text-align:center;font-family:'Patrick Hand',cursive;font-size:1.1rem;color:#5a4a3a;margin-bottom:2px">${playerInfo.businessName}</p>` : ''}
+    ${playerInfo.playerName ? `<p style="text-align:center;font-size:.75rem;color:#8a7a68;margin-bottom:8px">Owner: ${playerInfo.playerName}</p>` : ''}
+    <div class="grade-display ${gradeClass}">${grade}</div>
+    <div class="lesson-card" style="text-align:center;margin-bottom:10px">${gradeExpl}</div>
+
+    <h3 style="margin:8px 0 4px">Grade Breakdown</h3>
+    <div class="card" style="padding:10px">
+      <div style="margin-bottom:6px"><div class="flex-between" style="margin-bottom:2px"><span style="font-size:.75rem;font-weight:700">Net Worth Growth</span><span style="font-size:.68rem;color:#8a7a68">40%</span></div>${bar(scores.nwScore)}</div>
+      <div style="margin-bottom:6px"><div class="flex-between" style="margin-bottom:2px"><span style="font-size:.75rem;font-weight:700">Margin Discipline</span><span style="font-size:.68rem;color:#8a7a68">25%</span></div>${bar(scores.marginScore)}</div>
+      <div style="margin-bottom:6px"><div class="flex-between" style="margin-bottom:2px"><span style="font-size:.75rem;font-weight:700">Diversification</span><span style="font-size:.68rem;color:#8a7a68">15%</span></div>${bar(scores.divScore)}</div>
+      <div style="margin-bottom:6px"><div class="flex-between" style="margin-bottom:2px"><span style="font-size:.75rem;font-weight:700">Market Research</span><span style="font-size:.68rem;color:#8a7a68">12%</span></div>${bar(scores.researchScore)}</div>
+      <div><div class="flex-between" style="margin-bottom:2px"><span style="font-size:.75rem;font-weight:700">Market Access</span><span style="font-size:.68rem;color:#8a7a68">8%</span></div>${bar(scores.travelScore)}</div>
+    </div>
+
+    <h3 style="margin:10px 0 4px">Performance</h3>
+    <div class="end-stat"><span>Final Net Worth</span><span style="font-weight:800">$${G.netWorth.toFixed(2)}</span></div>
+    <div class="end-stat"><span>Total Profit</span><span style="color:${totalProfit>=0?'#5a7a4a':'#b83a2a'};font-weight:800">${totalProfit>=0?'+':''}$${totalProfit.toFixed(2)}</span></div>
+    <div class="end-stat"><span>Total Revenue</span><span>$${G.totalRevenue.toFixed(2)}</span></div>
+    <div class="end-stat"><span>Avg Profit Margin</span><span style="color:${avgMargin>=0?'#5a7a4a':'#b83a2a'};font-weight:700">${avgMargin}%</span></div>
+    <div class="end-stat"><span>Products Traded</span><span>${Object.keys(G.productsSold).length} of ${G.mode==='starter'?G.unlocked.length:6}</span></div>
+    <div class="end-stat"><span>Sales at a Loss</span><span style="${G.lossCount > 0 ? 'color:#b83a2a;font-weight:800' : ''}">${G.lossCount > 0 ? G.lossCount + ' (' + G.lossTotalUnits + ' units)' : 'None \u2014 nice!'}</span></div>
+    <div class="end-stat"><span>Market Research</span><span>${G.tipCount} tips ($${G.tipSpend})</span></div>
+    <div class="end-stat"><span>Neighborhoods Visited</span><span>${Object.keys(G.locationsVisited).length} of 4</span></div>
+    <div class="end-stat"><span>Total Travels</span><span>${G.travelCount}</span></div>
+    <div class="end-stat"><span>Final Wagon</span><span>${G.wagonCapacity} slots</span></div>
+    <div class="end-stat"><span>Personal Best</span><span>$${G.personalBest.toFixed(2)}</span></div>
+    <div class="end-stat"><span>Mode</span><span>${G.isCareer ? 'Career Mode 1-1: The Hustle (30 days)' : G.mode==='starter'?'Starter (15 days)':'Full Market (30 days)'}</span></div>
+    ${G.isCareer ? '<div class="end-stat"><span>Best Profit Streak</span><span>\uD83D\uDD25 ' + G.bestProfitStreak + ' in a row</span></div>' : ''}
+    
+    <div class="chart-container"><canvas id="endChart" height="140"></canvas></div>
+    
+    ${Object.keys(antCounts).length > 0 ? `<h2>Who You Met</h2>${Object.values(antCounts).map(a => `<div class="who-met"><span class="emoji">${a.emoji}</span><div><strong>${a.name}</strong> \u2014 ${a.title}<br><span class="text-muted">Appeared ${a.count} time${a.count>1?'s':''}</span></div></div>`).join('')}` : ''}
+    
+    <h2 style="margin-top:12px">What You Learned</h2>
+    ${lessons.map(l => `<div class="lesson-card">${l}</div>`).join('')}
+    
+    ${G.isCareer && (grade === 'A+' || grade === 'A') ? '<div class="upgrade-card"><h3>\uD83C\uDF1F Level Complete!</h3><p class="text-muted">You earned an A in Career Mode 1-1. Level 1-2: Wheels is coming soon!</p></div>' : ''}
+    ${G.isCareer && grade !== 'A+' && grade !== 'A' ? '<div class="lesson-card" style="text-align:center">You need an A grade to advance. Your current resources carry forward \u2014 try another season!</div>' : ''}
+    ${!G.isCareer && G.mode === 'full' && (grade === 'A+' || grade === 'A') ? '<div class="upgrade-card" style="cursor:pointer" onclick="beginCareerMode()"><h3>\uD83C\uDF1F Career Mode Unlocked!</h3><p class="text-muted">You\u2019ve proven yourself. Ready to go further? Your cash, inventory, and wagon carry forward.</p><button class="btn btn-primary" style="margin-top:6px">Continue to Career Mode \u2192</button></div>' : ''}
+    ${G.isCareer ? '<button class="btn btn-primary btn-lg" style="width:100%;margin-top:10px" onclick="replayCareerSeason()">Play Another Season</button>' : ''}
+    <button class="btn ${G.isCareer ? 'btn-sell' : 'btn-primary btn-lg'}" style="width:100%;margin-top:8px" onclick="G={};render()">Back to Menu</button>
+    <div class="copyright-footer">\u00A9 2026 [Owner Name]. All rights reserved.</div>
+  </div>`;
+  
+  setTimeout(drawEndChart, 100);
+}
+
+function generateLessons() {
+  const lessons = [];
+  const highNWThreshold = G.mode === 'starter' ? 120 : (G.netWorthHistory[0] || 50) * 3;
+  if (G.netWorth > highNWThreshold) lessons.push('\uD83D\uDCB0 You mastered the core of business: buy at a low cost, sell at a higher price, and protect your profit margin. That\u2019s called arbitrage \u2014 finding price differences across markets.');
+  if (G.travelCount < (G.days * 0.3)) lessons.push('\uD83D\uDDFA\uFE0F Move around! Different neighborhoods have different prices \u2014 that\u2019s geographic price variance. Traders who travel find better deals.');
+  if (G.travelCount >= (G.days * 0.6)) lessons.push('\uD83D\uDDFA\uFE0F Great mobility! Moving between markets helped you find the best prices. In business, this is called market access.');
+  if (G.tipCount === 0) lessons.push('\uD83D\uDCA1 Paying for information about a market before committing your money is called market research. Next time, try buying tips \u2014 sometimes paying for information saves you money!');
+  if (G.tipCount > 0) lessons.push(`\uD83D\uDCA1 You spent $${G.tipSpend} on market research. In real business, information has value \u2014 and your research helped guide your decisions.`);
+  if (G.lossCount > 0) lessons.push(`\uD83D\uDCC9 You sold ${G.lossTotalUnits} items below cost across ${G.lossCount} transaction${G.lossCount>1?'s':''}. Each time you sell for less than you paid, your profit margin goes negative. In real business, consistent losses signal a problem \u2014 investors and lenders watch this closely.`);
+  if (G.lossCount === 0 && G.sellHistory.length > 0) lessons.push('\uD83D\uDCC8 You never sold below cost \u2014 every trade had a positive profit margin. That\u2019s strong margin discipline, and it\u2019s exactly what investors look for.');
+  if (G.encounters.some(e => e.name === 'Mrs. Crawley')) lessons.push('\uD83D\uDC75 Mrs. Crawley represents regulation and community relations. In real business, managing your relationship with the community is as important as managing your money.');
+  if (G.encounters.some(e => e.name === 'Inspector Davis')) lessons.push('\uD83D\uDD75\uFE0F Inspector Davis represents regulatory compliance. When regulators give warnings, smart business owners listen and act fast to avoid penalties.');
+  if (G.encounters.some(e => e.name === 'Slick Eddie')) lessons.push('\uD83D\uDE0F Slick Eddie represents competition. Competitors can affect both your sell prices and your supply costs \u2014 that\u2019s called competitive pressure.');
+  if (G.encounters.some(e => e.name === 'Mother Nature')) lessons.push('\uD83C\uDF27\uFE0F Mother Nature represents external risk \u2014 events you can\u2019t prevent but can prepare for. Keeping cash reserves is your safety net against the unexpected.');
+  if (G.wagonCapacity === 50) lessons.push('\uD83D\uDED2 Spending money to increase your business\u2019s capacity is called a capital investment. It costs now but earns more later. Consider upgrading next time!');
+  if (G.wagonCapacity > 50) lessons.push('\uD83D\uDED2 Smart capital investment! Upgrading your wagon gave you more carrying capacity, which means more earning potential per trip.');
+  const lessonStartNW = G.netWorthHistory[0] || 50;
+  if (G.netWorth < lessonStartNW) lessons.push('\uD83D\uDCC9 You ended with less than you started. That\u2019s okay \u2014 every business owner learns from setbacks. Try again with what you\u2019ve learned!');
+  if (G.mode === 'full') lessons.push('\uD83D\uDE97 In Full Market Mode, you had to travel before selling. Every purchase was a commitment made with incomplete information \u2014 that\u2019s how real business works.');
+  return lessons;
+}
+
+function drawEndChart() {
+  const canvas = document.getElementById('endChart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const w = canvas.parentElement.clientWidth - 16;
+  canvas.width = w; canvas.height = 140;
+  const data = G.netWorthHistory;
+  const max = Math.max(...data, 60);
+  const min = Math.min(...data, 0);
+  const range = max - min || 1;
+  const stepX = w / (data.length - 1 || 1);
+  // Grid
+  ctx.strokeStyle = '#e0d6c2'; ctx.lineWidth = 0.5;
+  for (let i = 0; i < 4; i++) {
+    const y = 10 + (i/3)*120;
+    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(w,y); ctx.stroke();
+  }
+  // $50 baseline
+  const baseY = 130 - ((50 - min)/range)*120;
+  ctx.strokeStyle = '#c9302c'; ctx.lineWidth = 1; ctx.setLineDash([4,4]);
+  ctx.beginPath(); ctx.moveTo(0,baseY); ctx.lineTo(w,baseY); ctx.stroke();
+  ctx.setLineDash([]);
+  // Line
+  ctx.strokeStyle = '#5a7a4a'; ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  data.forEach((v,i) => {
+    const x = i * stepX;
+    const y = 130 - ((v-min)/range)*120;
+    i === 0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+  });
+  ctx.stroke();
+  // Labels
+  ctx.fillStyle = '#8a7a68'; ctx.font = '10px Nunito';
+  ctx.fillText('$'+min.toFixed(0), 2, 138);
+  ctx.fillText('$'+max.toFixed(0), 2, 18);
+  ctx.fillText('Day 1', 2, baseY-4);
+  ctx.fillText('Day '+data.length, w-30, 138);
+}
+
+// Draw sparkline on stats tab
+const observer = new MutationObserver(() => {
+  const canvas = document.getElementById('sparkline');
+  if (canvas && G.netWorthHistory) {
+    const ctx = canvas.getContext('2d');
+    const w = canvas.parentElement.clientWidth - 16;
+    canvas.width = w; canvas.height = 120;
+    const data = G.netWorthHistory;
+    const max = Math.max(...data, 60);
+    const min = Math.min(...data, 0);
+    const range = max - min || 1;
+    const stepX = w / (data.length - 1 || 1);
+    ctx.strokeStyle = '#5a7a4a'; ctx.lineWidth = 2;
+    ctx.beginPath();
+    data.forEach((v,i) => {
+      const x = i * stepX;
+      const y = 110 - ((v-min)/range)*100;
+      i === 0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+    });
+    ctx.stroke();
+    ctx.fillStyle = '#8a7a68'; ctx.font = '10px Nunito';
+    ctx.fillText('$'+max.toFixed(0), 2, 14);
+    ctx.fillText('$'+min.toFixed(0), 2, 118);
+  }
+});
+observer.observe(document.getElementById('app'), { childList:true, subtree:true });
+
+// ===== INITIAL RENDER =====
+render();
+</script>
+</body>
+</html>
