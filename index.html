@@ -208,7 +208,7 @@ const EVENTS = [
   { id:'crawley3', ant:'crawley', name:'Rallied the Neighbors', desc:'Mrs. Crawley organized a boycott \u2014 that\u2019s when people agree to stop buying from you. Sell prices are halved at this location today.', effect:'half_sell', minDay:8, tip:'A boycott is a form of community pressure. Your reputation affects your revenue. In business, this is called brand risk.' },
   // Inspector Davis
   { id:'davis1', ant:'davis', name:'Surprise Inspection!', desc:'Inspector Davis is conducting a compliance audit \u2014 checking whether your business meets health and safety regulations!', effect:'lose_inv', value:.30, minDay:3, tip:'Regulatory compliance means following the rules set by authorities. Failing an audit can cost you inventory, time, or money.' },
-  { id:'davis2', ant:'davis', name:'Compliance Warning', desc:'Inspector Davis found an issue with your setup. You can fix it right now for $5 (proactive compliance), or take the risk and deal with it later 2014 if you2019re still here tomorrow, the fine is $10.', effect:'choice_compliance', value:10, minDay:5, tip:'Proactive compliance means fixing problems before they become penalties. It2019s almost always cheaper to address issues early.' },
+  { id:'davis2', ant:'davis', name:'Compliance Warning', desc:'Inspector Davis found an issue with your setup. You can fix it right now for $5 (proactive compliance), or take the risk and deal with it later — if you are still here tomorrow, the fine is $10.', effect:'choice_compliance', value:10, minDay:5, tip:'Proactive compliance means fixing problems before they become penalties. It is almost always cheaper to address issues early.' },
   { id:'davis3', ant:'davis', name:'Failed Inspection!', desc:'You failed the inspection! In business, a failed audit means penalties. You lose a day of operations and pay an $8 fine.', effect:'day_lost_fine', value:8, minDay:9, tip:'Failed inspections cost both time and money. The total impact on your business is called a regulatory penalty.' },
   // Slick Eddie
   { id:'eddie1', ant:'eddie', name:'Set Up Shop!', desc:'Slick Eddie opened a competing stand nearby! Your sell prices just dropped 40%. You can stay and compete at lower prices, or pay Eddie  to pack up and leave.', effect:'choice_eddie', value:.40, minDay:2, tip:'When a competitor enters your market, you have options. Staying means lower margins. Paying to remove competition costs cash but restores your prices.' },
@@ -231,6 +231,74 @@ const WAGON_UPGRADES = {
     { threshold:300, minDay:16, cost:35, capacity:100, label:'Second Wagon' }
   ]
 };
+
+// ===== SOUND EFFECTS =====
+let audioCtx = null;
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+function playSound(type) {
+  try {
+    var ctx = getAudioCtx();
+    var osc = ctx.createOscillator();
+    var gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    gain.gain.value = 0.15;
+    var now = ctx.currentTime;
+    if (type === 'buy') {
+      // Soft click — confirms purchase
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(800, now);
+      osc.frequency.setValueAtTime(1000, now + 0.05);
+      gain.gain.setValueAtTime(0.12, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+      osc.start(now);
+      osc.stop(now + 0.12);
+    } else if (type === 'sell') {
+      // Cash register cha-ching
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(1200, now);
+      osc.frequency.setValueAtTime(1600, now + 0.06);
+      osc.frequency.setValueAtTime(2000, now + 0.12);
+      gain.gain.setValueAtTime(0.15, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+      osc.start(now);
+      osc.stop(now + 0.25);
+    } else if (type === 'loss') {
+      // Low descending tone — warning
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(400, now);
+      osc.frequency.exponentialRampToValueAtTime(200, now + 0.3);
+      gain.gain.setValueAtTime(0.15, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+      osc.start(now);
+      osc.stop(now + 0.35);
+    } else if (type === 'event') {
+      // Alert chime — something happened
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(600, now);
+      osc.frequency.setValueAtTime(900, now + 0.1);
+      osc.frequency.setValueAtTime(600, now + 0.2);
+      gain.gain.setValueAtTime(0.1, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+      osc.start(now);
+      osc.stop(now + 0.3);
+    } else if (type === 'upgrade') {
+      // Triumphant rising tone
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(500, now);
+      osc.frequency.setValueAtTime(700, now + 0.1);
+      osc.frequency.setValueAtTime(1000, now + 0.2);
+      osc.frequency.setValueAtTime(1200, now + 0.3);
+      gain.gain.setValueAtTime(0.15, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+      osc.start(now);
+      osc.stop(now + 0.45);
+    }
+  } catch(e) {}
+}
 
 // ===== PLAYER INFO (persists across games) =====
 let playerInfo = { playerName: '', businessName: '' };
@@ -572,6 +640,7 @@ function buyProduct(productId, qty) {
   const cost = price * qty;
   if (cost > G.cash || qty > wagonFree()) return;
   G.cash = Math.round((G.cash - cost)*100)/100;
+  playSound('buy');
   // Update average buy price using weighted average
   const prevQty = G.inventory[productId];
   const prevAvg = G.avgBuyPrice[productId] || 0;
@@ -609,6 +678,7 @@ function sellProduct(productId, qty) {
     G.profitStreak++;
     if (G.profitStreak > G.bestProfitStreak) G.bestProfitStreak = G.profitStreak;
   }
+  playSound(isLoss ? 'loss' : 'sell');
   G.sellHistory.push({ product:productId, qty, price, day:G.day, avgCost, isLoss });
   G.productsSold[productId] = (G.productsSold[productId] || 0) + qty;
   G.hasSoldThisTurn = true;
@@ -708,6 +778,7 @@ function purchaseWagonUpgrade() {
   G.wagonUpgradeIndex++;
   updateNetWorth();
   render();
+  playSound('upgrade');
   showModal({ type:'upgrade', title:'Wagon Upgraded!', desc:`Your capacity is now ${G.wagonCapacity} slots! Spending money to increase your business\u2019s ability to operate is called a capital investment \u2014 you spent cash now to earn more later.`, emoji:'\uD83D\uDED2', tip:'Capital investment is one of the most important decisions in business. Every dollar spent on growth is a dollar not spent on inventory \u2014 that trade-off is called opportunity cost.' });
 }
 
@@ -1007,7 +1078,7 @@ function showTOS() {
       <p>Notebook Mogul is an educational business simulation game designed to teach financial literacy concepts. The game is provided for educational and entertainment purposes only and does not constitute financial advice.</p>
 
       <h3>3. Intellectual Property</h3>
-      <p>All content, design, code, game mechanics, characters, text, graphics, and other materials in this application are the exclusive intellectual property of [Owner Name] and are protected by applicable copyright, trademark, and other intellectual property laws. No part of this application may be reproduced, distributed, modified, reverse-engineered, or used for any commercial purpose without prior written permission.</p>
+      <p>All content, design, code, game mechanics, characters, text, graphics, and other materials in this application are the exclusive intellectual property of Brent Frazier and are protected by applicable copyright, trademark, and other intellectual property laws. No part of this application may be reproduced, distributed, modified, reverse-engineered, or used for any commercial purpose without prior written permission.</p>
 
       <h3>4. User Conduct</h3>
       <p>You agree to use this application only for its intended educational purpose. You may not attempt to copy, modify, distribute, sell, or create derivative works based on this application or any of its content.</p>
@@ -1019,13 +1090,13 @@ function showTOS() {
       <p>This application is provided \u201Cas is\u201D without warranties of any kind. The developer does not guarantee uninterrupted or error-free operation. Educational content is designed for general financial literacy instruction and should not be relied upon as professional financial advice.</p>
 
       <h3>7. Limitation of Liability</h3>
-      <p>In no event shall [Owner Name] be liable for any damages arising from the use or inability to use this application.</p>
+      <p>In no event shall Brent Frazier be liable for any damages arising from the use or inability to use this application.</p>
 
       <h3>8. Changes to Terms</h3>
       <p>These terms may be updated from time to time. Continued use of the application following any changes constitutes acceptance of the revised terms.</p>
 
       <h3>9. Contact</h3>
-      <p>For questions about these terms, please contact [Contact Email].</p>
+      <p>For questions about these terms, please contact brent@brentfrazier.com.</p>
     </div>
     <button class="btn btn-primary" onclick="this.closest('.modal-overlay').remove();modalVisible=false;">Close</button>
   </div>`;
@@ -1051,6 +1122,7 @@ function getEventImage(event) {
 
 function showModal(event) {
   modalVisible = true;
+  playSound('event');
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
   overlay.innerHTML = '<div class="modal">' +
@@ -1066,6 +1138,7 @@ function showModal(event) {
 
 function showChoiceModal(title, emoji, desc, tip, choices) {
   modalVisible = true;
+  playSound('event');
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
   overlay.id = 'choiceModal';
@@ -1381,7 +1454,7 @@ function renderStart(app) {
       </div>
       <button class="btn btn-primary btn-lg" style="width:100%;margin-top:4px" onclick="submitNames()">Let\u2019s Go! \u2192</button>
       <p class="text-muted" style="margin-top:10px;font-size:.7rem">Your name appears on your market report. Your business name appears during gameplay.</p>
-      <div class="copyright-footer">\u00A9 2026 [Owner Name]. All rights reserved.<br>Notebook Mogul\u2122 is a proprietary educational simulation.</div>
+      <div class="copyright-footer">\u00A9 2026 Brent Frazier. All rights reserved.<br>Notebook Mogul\u2122 is a proprietary educational simulation.</div>
     </div>`;
     return;
   }
@@ -1596,7 +1669,7 @@ function renderEnd(app) {
     ${!G.isCareer && G.mode === 'full' && (grade === 'A+' || grade === 'A') ? '<div class="upgrade-card" style="cursor:pointer" onclick="beginCareerMode()"><h3>\uD83C\uDF1F Career Mode Unlocked!</h3><p class="text-muted">You\u2019ve proven yourself. Ready to go further? Your cash, inventory, and wagon carry forward.</p><button class="btn btn-primary" style="margin-top:6px">Continue to Career Mode \u2192</button></div>' : ''}
     ${G.isCareer ? '<button class="btn btn-primary btn-lg" style="width:100%;margin-top:10px" onclick="replayCareerSeason()">Play Another Season</button>' : ''}
     <button class="btn ${G.isCareer ? 'btn-sell' : 'btn-primary btn-lg'}" style="width:100%;margin-top:8px" onclick="G={};render()">Back to Menu</button>
-    <div class="copyright-footer">\u00A9 2026 [Owner Name]. All rights reserved.</div>
+    <div class="copyright-footer">\u00A9 2026 Brent Frazier. All rights reserved.</div>
   </div>`;
   
   setTimeout(drawEndChart, 100);
