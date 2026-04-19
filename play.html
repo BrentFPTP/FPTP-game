@@ -70,7 +70,7 @@ h3{font-size:.88rem;font-weight:700;color:#6b5b4a}
 /* ===== MODAL ===== */
 .modal-overlay{position:fixed;inset:0;background:rgba(30,25,18,.6);display:flex;align-items:center;justify-content:center;z-index:100;padding:16px;animation:modalFadeIn .25s ease;backdrop-filter:blur(2px)}
 @keyframes modalFadeIn{from{opacity:0}to{opacity:1}}
-.modal{background:#faf5eb;border-radius:14px;padding:22px 18px;max-width:380px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.35),0 0 0 1px rgba(0,0,0,.05);text-align:center;animation:modalSlideUp .3s ease}
+.modal{background:#faf5eb;border-radius:14px;padding:22px 18px;max-width:380px;width:100%;max-height:calc(100vh - 32px);overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.35),0 0 0 1px rgba(0,0,0,.05);text-align:center;animation:modalSlideUp .3s ease;-webkit-overflow-scrolling:touch}
 @keyframes modalSlideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
 .modal h2{margin-bottom:8px;font-family:'Patrick Hand',cursive;font-size:1.4rem;color:#4a3a2a}.modal p{font-size:1.0rem;color:#5a4a3a;margin-bottom:10px;line-height:1.5}
 .modal .tip-text{font-size:.92rem;color:#7a5a3a;font-style:italic;margin-top:8px;padding:8px 10px;background:#f0e8d4;border-radius:8px;border-left:3px solid #b85c2a;text-align:left;line-height:1.4}
@@ -193,13 +193,14 @@ const STORM_RAIN_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDA
 // ===================================================================
 
 // ===== GAME CONFIGURATION =====
+// Each product has two price ranges: default (Full Market, Career) and starter (easier, for new players)
 const PRODUCTS = [
-  { id:'lemonade', name:'Lemonade', emoji:'🍋', buyMin:.50, buyMax:1.10, sellMin:.65, sellMax:1.40, unlockDay:1 },
-  { id:'water', name:'Bottled Water', emoji:'💧', buyMin:.35, buyMax:.80, sellMin:.50, sellMax:1.10, unlockDay:4 },
-  { id:'cookies', name:'Cookies', emoji:'🍪', buyMin:.90, buyMax:1.70, sellMin:1.10, sellMax:2.20, unlockDay:7 },
-  { id:'candy', name:'Candy', emoji:'🍬', buyMin:.45, buyMax:.95, sellMin:.60, sellMax:1.30, unlockDay:10 },
-  { id:'soda', name:'Soda Pop', emoji:'🥤', buyMin:.70, buyMax:1.30, sellMin:.90, sellMax:1.80, unlockDay:13 },
-  { id:'toys', name:'Small Toys', emoji:'🧸', buyMin:1.80, buyMax:3.50, sellMin:2.30, sellMax:4.50, unlockDay:15 }
+  { id:'lemonade', name:'Lemonade', emoji:'🍋', buyMin:.50, buyMax:1.10, sellMin:.65, sellMax:1.40, starterBuyMin:.50, starterBuyMax:.95, starterSellMin:.85, starterSellMax:1.48, unlockDay:1 },
+  { id:'water', name:'Bottled Water', emoji:'💧', buyMin:.35, buyMax:.80, sellMin:.50, sellMax:1.10, starterBuyMin:.35, starterBuyMax:.69, starterSellMin:.65, starterSellMax:1.16, unlockDay:4 },
+  { id:'cookies', name:'Cookies', emoji:'🍪', buyMin:.90, buyMax:1.70, sellMin:1.10, sellMax:2.20, starterBuyMin:.90, starterBuyMax:1.46, starterSellMin:1.36, starterSellMax:2.31, unlockDay:7 },
+  { id:'candy', name:'Candy', emoji:'🍬', buyMin:.45, buyMax:.95, sellMin:.60, sellMax:1.30, starterBuyMin:.45, starterBuyMax:.82, starterSellMin:.76, starterSellMax:1.37, unlockDay:10 },
+  { id:'soda', name:'Soda Pop', emoji:'🥤', buyMin:.70, buyMax:1.30, sellMin:.90, sellMax:1.80, starterBuyMin:.70, starterBuyMax:1.12, starterSellMin:1.10, starterSellMax:1.89, unlockDay:13 },
+  { id:'toys', name:'Small Toys', emoji:'🧸', buyMin:1.80, buyMax:3.50, sellMin:2.30, sellMax:4.50, starterBuyMin:1.80, starterBuyMax:3.01, starterSellMin:2.86, starterSellMax:4.72, unlockDay:15 }
 ];
 
 const NEIGHBORHOODS = [
@@ -415,16 +416,22 @@ function savePersonalBest(mode, val) {
 function generatePrices() {
   G.prices = {};
   const vm = G.adaptive.volatilityMult;
+  const useStarter = G.mode === 'starter';
   NEIGHBORHOODS.forEach(n => {
     G.prices[n.id] = {};
     PRODUCTS.forEach(p => {
       const mod = n.mods[p.id] || 1.0;
+      // Pick ranges based on mode (Starter uses easier ranges to reduce unfair losses for new players)
+      const buyMin = useStarter ? p.starterBuyMin : p.buyMin;
+      const buyMax = useStarter ? p.starterBuyMax : p.buyMax;
+      const sellMin = useStarter ? p.starterSellMin : p.sellMin;
+      const sellMax = useStarter ? p.starterSellMax : p.sellMax;
       // Buy price
-      const buyRange = p.buyMax - p.buyMin;
-      const buyBase = p.buyMin + Math.random() * buyRange;
+      const buyRange = buyMax - buyMin;
+      const buyBase = buyMin + Math.random() * buyRange;
       // Sell price with location modifier and volatility
-      const sellRange = (p.sellMax - p.sellMin) * vm;
-      const sellBase = p.sellMin + Math.random() * sellRange;
+      const sellRange = (sellMax - sellMin) * vm;
+      const sellBase = sellMin + Math.random() * sellRange;
       let sellPrice = sellBase * mod;
       // Apply saturation if current location
       if (n.id === NEIGHBORHOODS[G.location].id) {
