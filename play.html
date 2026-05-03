@@ -371,6 +371,36 @@ const WAGON_UPGRADES = {
   ]
 };
 
+// ===== TIER-AWARE CONFIGURATION (Phase A refactor, v17b) =====
+// All gameplay configuration is keyed by tier. Today there is one tier ('1-1');
+// new tiers (1-2, 1-3, 2-x, etc.) are added by registering a new TIER_DATA entry.
+// Game logic must call the get* wrappers below, NOT the bare constants directly.
+// The bare constants are preserved as the source of truth for tier '1-1' so this
+// refactor is behavior-preserving.
+const TIER_DATA = {
+  '1-1': {
+    products: PRODUCTS,
+    neighborhoods: NEIGHBORHOODS,
+    antagonists: ANTAGONISTS,
+    events: EVENTS,
+    wagonUpgrades: WAGON_UPGRADES
+  }
+};
+
+// currentTier() decides which tier's data the game should be running on right now.
+// Today: Starter, Full Market, and Career 1-1 all use tier '1-1' data.
+// Phase B onward: when G.careerLevel === '1-2', this will return '1-2'.
+function currentTier() {
+  if (G && G.isCareer && G.careerLevel) return G.careerLevel;
+  return '1-1';
+}
+
+function getProducts()       { return TIER_DATA[currentTier()].products; }
+function getNeighborhoods()  { return TIER_DATA[currentTier()].neighborhoods; }
+function getAntagonists()    { return TIER_DATA[currentTier()].antagonists; }
+function getEvents()         { return TIER_DATA[currentTier()].events; }
+function getWagonUpgrades()  { return TIER_DATA[currentTier()].wagonUpgrades; }
+
 // ===== SOUND EFFECTS =====
 let audioCtx = null;
 function getAudioCtx() {
@@ -455,7 +485,7 @@ function newGame(mode) {
     soldToday:false, hasSoldThisTurn:false, boughtHere:false, arrivedViaTravel:false, daysAtLocation:0, recentVisits:[],
     totalRevenue:0, totalProfit:0, travelCount:0,
     encounters:[], tipSpend:0, tipCount:0,
-    unlocked: mode === 'full' ? PRODUCTS.map(p=>p.id) : ['lemonade'],
+    unlocked: mode === 'full' ? getProducts().map(p=>p.id) : ['lemonade'],
     prices:null, activeEffects:{}, complianceWarning:false,
     personalBest: loadPersonalBest(mode),
     // Adaptive difficulty
@@ -476,8 +506,8 @@ function newGame(mode) {
     // Career Mode
     isCareer: false, careerLevel: null, profitStreak: 0, bestProfitStreak: 0
   };
-  PRODUCTS.forEach(p => G.inventory[p.id] = 0);
-  G.locationsVisited[NEIGHBORHOODS[0].id] = 1;
+  getProducts().forEach(p => G.inventory[p.id] = 0);
+  G.locationsVisited[getNeighborhoods()[0].id] = 1;
   generatePrices();
   render();
 }
@@ -498,7 +528,7 @@ function startCareerMode(carryOver) {
     soldToday: false, hasSoldThisTurn: false, boughtHere: false, arrivedViaTravel: false, daysAtLocation: 0, recentVisits: [],
     totalRevenue: 0, totalProfit: 0, travelCount: 0,
     encounters: [], tipSpend: 0, tipCount: 0,
-    unlocked: PRODUCTS.map(p => p.id),
+    unlocked: getProducts().map(p => p.id),
     prices: null, activeEffects: {}, complianceWarning: false,
     personalBest: loadPersonalBest('career_1_1'),
     adaptive: { skillScore: 0.3, eventBoost: 0, volatilityMult: 1.1, eddieAggro: 1.1 },
@@ -513,8 +543,8 @@ function startCareerMode(carryOver) {
     isCareer: true, careerLevel: '1-1', profitStreak: 0, bestProfitStreak: 0
   };
   // Copy inventory
-  PRODUCTS.forEach(p => { G.inventory[p.id] = prevInventory[p.id] || 0; });
-  G.locationsVisited[NEIGHBORHOODS[0].id] = 1;
+  getProducts().forEach(p => { G.inventory[p.id] = prevInventory[p.id] || 0; });
+  G.locationsVisited[getNeighborhoods()[0].id] = 1;
   // Calculate starting net worth
   generatePrices();
   updateNetWorth();
@@ -541,9 +571,11 @@ function generatePrices() {
   G.prices = {};
   const vm = G.adaptive.volatilityMult;
   const useStarter = G.mode === 'starter';
-  NEIGHBORHOODS.forEach(n => {
+  const neighborhoods = getNeighborhoods();
+  const products = getProducts();
+  neighborhoods.forEach(n => {
     G.prices[n.id] = {};
-    PRODUCTS.forEach(p => {
+    products.forEach(p => {
       const mod = n.mods[p.id] || 1.0;
       // Pick ranges based on mode (Starter uses easier ranges to reduce unfair losses for new players)
       const buyMin = useStarter ? p.starterBuyMin : p.buyMin;
@@ -558,7 +590,7 @@ function generatePrices() {
       const sellBase = sellMin + Math.random() * sellRange;
       let sellPrice = sellBase * mod;
       // Apply saturation if current location has been visited 3+ times in the last 5 days
-      if (n.id === NEIGHBORHOODS[G.location].id) {
+      if (n.id === neighborhoods[G.location].id) {
         const recentCount = (G.recentVisits || []).filter(v => v.location === G.location && (G.day - v.day) < 5).length;
         if (recentCount >= 3) {
           const satPenalty = Math.min((recentCount - 2) * 0.15, 0.50);
@@ -566,13 +598,13 @@ function generatePrices() {
         }
       }
       // Apply active effects
-      if (G.activeEffects.half_sell && n.id === NEIGHBORHOODS[G.location].id) sellPrice *= 0.5;
-      if (G.activeEffects.drop_sell && n.id === NEIGHBORHOODS[G.location].id) sellPrice *= (1 - G.activeEffects.drop_sell);
-      if (G.activeEffects.crawley_goodwill && n.id === NEIGHBORHOODS[G.location].id) sellPrice *= 1.2;
-      if (G.activeEffects.cold_snap && (p.id==='lemonade'||p.id==='water') && n.id === NEIGHBORHOODS[G.location].id) sellPrice *= 0.3;
+      if (G.activeEffects.half_sell && n.id === neighborhoods[G.location].id) sellPrice *= 0.5;
+      if (G.activeEffects.drop_sell && n.id === neighborhoods[G.location].id) sellPrice *= (1 - G.activeEffects.drop_sell);
+      if (G.activeEffects.crawley_goodwill && n.id === neighborhoods[G.location].id) sellPrice *= 1.2;
+      if (G.activeEffects.cold_snap && (p.id==='lemonade'||p.id==='water') && n.id === neighborhoods[G.location].id) sellPrice *= 0.3;
       let buyPrice = buyBase;
-      if (G.activeEffects.cold_snap && (p.id==='lemonade'||p.id==='water') && n.id === NEIGHBORHOODS[G.location].id) buyPrice *= 0.4;
-      if (G.activeEffects.raise_buy && n.id === NEIGHBORHOODS[G.location].id) buyPrice *= (1 + G.activeEffects.raise_buy);
+      if (G.activeEffects.cold_snap && (p.id==='lemonade'||p.id==='water') && n.id === neighborhoods[G.location].id) buyPrice *= 0.4;
+      if (G.activeEffects.raise_buy && n.id === neighborhoods[G.location].id) buyPrice *= (1 + G.activeEffects.raise_buy);
       if (G.activeEffects.global_buy_up) buyPrice *= (1 + G.activeEffects.global_buy_up);
       G.prices[n.id][p.id] = { buy: Math.round(buyPrice*100)/100, sell: Math.round(sellPrice*100)/100 };
     });
@@ -586,12 +618,12 @@ function wagonPercent() { return (totalInventory() / G.wagonCapacity) * 100; }
 
 // ===== UNLOCKED PRODUCTS =====
 function getUnlocked() {
-  if (G.mode === 'full') return PRODUCTS;
-  return PRODUCTS.filter(p => G.day >= p.unlockDay);
+  if (G.mode === 'full') return getProducts();
+  return getProducts().filter(p => G.day >= p.unlockDay);
 }
 function checkNewUnlocks() {
   if (G.mode !== 'starter') return null;
-  const newly = PRODUCTS.filter(p => p.unlockDay === G.day && !G.unlocked.includes(p.id));
+  const newly = getProducts().filter(p => p.unlockDay === G.day && !G.unlocked.includes(p.id));
   newly.forEach(p => G.unlocked.push(p.id));
   return newly.length > 0 ? newly : null;
 }
@@ -625,13 +657,13 @@ function rollForEvent() {
   if (G.complianceWarning) {
     G.complianceWarning = false;
     G.cash -= 10;
-    G.encounters.push({ ...ANTAGONISTS.davis, eventName:'Compliance Fine!', day:G.day });
+    G.encounters.push({ ...getAntagonists().davis, eventName:'Compliance Fine!', day:G.day });
     return { type:'compliance_fine', eventImg: DAVIS_FINE_IMG, title:'Compliance Fine!', desc:'You didn\'t move! Inspector Davis fined you $10.', emoji:'️', tip:'Ignoring warnings costs money. Act on information while you still can.' };
   }
-  const eligible = EVENTS.filter(e => G.day >= e.minDay);
+  const eligible = getEvents().filter(e => G.day >= e.minDay);
   if (eligible.length === 0) return null;
   const event = eligible[Math.floor(Math.random() * eligible.length)];
-  const ant = ANTAGONISTS[event.ant];
+  const ant = getAntagonists()[event.ant];
   G.encounters.push({ ...ant, eventName:event.name, day:G.day });
   // Apply effects
   G.activeEffects = {};
@@ -648,7 +680,7 @@ function rollForEvent() {
         Object.keys(G.inventory).forEach(k => {
           const loss = Math.floor(G.inventory[k] * pct);
           if (loss > 0) {
-            const prod = PRODUCTS.find(p => p.id === k);
+            const prod = getProducts().find(p => p.id === k);
             confiscated.push(`${loss} ${prod ? prod.name : k}`);
             G.inventory[k] -= loss;
           }
@@ -675,7 +707,7 @@ function rollForEvent() {
         Object.keys(G.inventory).forEach(k => {
           const loss = Math.floor(G.inventory[k] * event.value);
           if (loss > 0) {
-            const prod = PRODUCTS.find(p => p.id === k);
+            const prod = getProducts().find(p => p.id === k);
             losses.push(loss + ' ' + (prod ? prod.name : k));
             G.inventory[k] -= loss;
           }
@@ -696,7 +728,7 @@ function rollForEvent() {
         Object.keys(G.inventory).forEach(k => {
           const loss = Math.floor(G.inventory[k] * event.value);
           if (loss > 0) {
-            const prod = PRODUCTS.find(p => p.id === k);
+            const prod = getProducts().find(p => p.id === k);
             losses2.push(loss + ' ' + (prod ? prod.name : k));
             G.inventory[k] -= loss;
           }
@@ -719,7 +751,7 @@ function rollForEvent() {
 
 // ===== WAGON UPGRADE CHECK =====
 function checkWagonUpgrade() {
-  const upgrades = WAGON_UPGRADES[G.mode] || WAGON_UPGRADES.starter;
+  const upgrades = getWagonUpgrades()[G.mode] || getWagonUpgrades().starter;
   if (G.wagonUpgradeIndex >= upgrades.length) return null;
   const upgrade = upgrades[G.wagonUpgradeIndex];
   if (G.netWorth >= upgrade.threshold && G.day >= upgrade.minDay) return upgrade;
@@ -786,8 +818,8 @@ function advanceDay(skipEvent) {
 
 function updateNetWorth() {
   let invValue = 0;
-  const loc = NEIGHBORHOODS[G.location].id;
-  PRODUCTS.forEach(p => {
+  const loc = getNeighborhoods()[G.location].id;
+  getProducts().forEach(p => {
     if (G.inventory[p.id] > 0 && G.prices[loc] && G.prices[loc][p.id]) {
       invValue += G.inventory[p.id] * G.prices[loc][p.id].sell;
     }
@@ -802,7 +834,7 @@ function updateNetWorth() {
 
 // ===== ACTIONS =====
 function buyProduct(productId, qty) {
-  const loc = NEIGHBORHOODS[G.location].id;
+  const loc = getNeighborhoods()[G.location].id;
   const price = G.prices[loc][productId].buy;
   const cost = price * qty;
   if (cost > G.cash || qty > wagonFree()) return;
@@ -825,7 +857,7 @@ function sellProduct(productId, qty) {
   if (G.soldToday || qty <= 0 || G.inventory[productId] < qty) return;
   // Full Market: hard guard — must have traveled to sell
   if (G.mode === 'full' && !G.arrivedViaTravel) return;
-  const loc = NEIGHBORHOODS[G.location].id;
+  const loc = getNeighborhoods()[G.location].id;
   const price = G.prices[loc][productId].sell;
   const revenue = price * qty;
   G.cash = Math.round((G.cash + revenue)*100)/100;
@@ -854,7 +886,7 @@ function sellProduct(productId, qty) {
   // Show Maeve-led loss popup (combines former Negative Margin modal + first-loss advisor tip)
   if (isLoss && !G.lossFirstSeen) {
     G.lossFirstSeen = true;
-    const product = PRODUCTS.find(p => p.id === productId);
+    const product = getProducts().find(p => p.id === productId);
     const lossAmount = Math.abs(profit).toFixed(2);
     const message = `Hey, I saw that last sale. You sold <strong>${product.name}</strong> for $${price.toFixed(2)} each, but you paid $${avgCost.toFixed(2)} \u2014 so you lost <strong>$${lossAmount}</strong> on that trade. That\u2019s what we call <strong>negative margin</strong>: when your sell price is lower than your buy price.<br><br>Don\u2019t sweat it \u2014 every business owner takes a loss sometimes. The trick is catching it before you commit. On the Sell tab, you can see your <strong>average cost</strong> for each product. If the sell price here is lower than that, sometimes it\u2019s smarter to hold the inventory and sell it somewhere else.`;
     advisorState.shownTips.firstLoss = true;
@@ -904,7 +936,7 @@ function travel(destIndex) {
   G.recentVisits.push({ location: destIndex, day: G.day });
   G.recentVisits = G.recentVisits.filter(v => (G.day - v.day) < 7);
   G.travelCount++;
-  const locId = NEIGHBORHOODS[destIndex].id;
+  const locId = getNeighborhoods()[destIndex].id;
   G.locationsVisited[locId] = (G.locationsVisited[locId] || 0) + 1;
   G._willArrive = true;
   advanceDay();
@@ -933,13 +965,14 @@ function buyTip() {
   G.tipSpend += cost;
   G.tipCount++;
   // Pick random non-current neighborhood
-  const others = NEIGHBORHOODS.filter((_,i) => i !== G.location);
+  const neighborhoods = getNeighborhoods();
+  const others = neighborhoods.filter((_,i) => i !== G.location);
   const target = others[Math.floor(Math.random()*others.length)];
   // Check if prices are above average
   let totalSell = 0, count = 0;
   const unlocked = getUnlocked();
   unlocked.forEach(p => {
-    NEIGHBORHOODS.forEach(n => { totalSell += G.prices[n.id][p.id].sell; count++; });
+    neighborhoods.forEach(n => { totalSell += G.prices[n.id][p.id].sell; count++; });
   });
   const avgSell = totalSell / count;
   let targetAvg = 0;
@@ -957,7 +990,7 @@ function buyTip() {
 }
 
 function purchaseWagonUpgrade() {
-  const upgrades = WAGON_UPGRADES[G.mode] || WAGON_UPGRADES.starter;
+  const upgrades = getWagonUpgrades()[G.mode] || getWagonUpgrades().starter;
   const upgrade = upgrades[G.wagonUpgradeIndex];
   if (!upgrade || G.cash < upgrade.cost) return;
   const purchasedIndex = G.wagonUpgradeIndex; // capture before incrementing
@@ -1380,7 +1413,7 @@ function checkAdvisorTutorial() {
   if (step === 1 && G.buyHistory.length > 0 && G.sellHistory.length === 0) {
     advisorState.tutorialStep = 2;
     const lastBuy = G.buyHistory[G.buyHistory.length - 1];
-    const prodName = PRODUCTS.find(p => p.id === lastBuy.product)?.name || 'that product';
+    const prodName = getProducts().find(p => p.id === lastBuy.product)?.name || 'that product';
     if (G.mode === 'starter') {
       showAdvisor(
         `Nice! You bought ${prodName} at <strong>$${lastBuy.price.toFixed(2)} each</strong>. That\u2019s your <strong>cost</strong>.\n\nNow go to the <strong>Sell tab</strong> and sell it. Look at the sell price \u2014 if it\u2019s higher than what you paid, you\u2019ll make a <strong>profit</strong>. If it\u2019s lower, you\u2019ll take a <strong>loss</strong>. The difference is called your <strong>profit margin</strong>.`.replace(/\n/g, '<br>'),
@@ -1388,7 +1421,7 @@ function checkAdvisorTutorial() {
       );
     } else {
       showAdvisor(
-        `Nice! You bought ${prodName} at <strong>$${lastBuy.price.toFixed(2)} each</strong>. That\u2019s your <strong>cost</strong>.\n\nIn Full Market Mode, you can\u2019t sell where you bought. You need to <strong>travel to a different neighborhood</strong> first. Check the <strong>Travel tab</strong> \u2014 each neighborhood has different prices. That\u2019s where the opportunity is!`.replace(/\n/g, '<br>'),
+        `Nice! You bought ${prodName} at <strong>$${lastBuy.price.toFixed(2)} each</strong>. That\u2019s your <strong>cost</strong>.\n\nIn Full Market Mode, you can\u2019t sell where you bought. You need to <strong>travel to a different neighborhood</strong> first. Check the <strong>Map tab</strong> \u2014 each neighborhood has different prices. That\u2019s where the opportunity is!`.replace(/\n/g, '<br>'),
         'Got it!'
       );
     }
@@ -1402,7 +1435,7 @@ function checkAdvisorTutorial() {
     const avgCost = lastSell.avgCost || 0;
     const margin = avgCost > 0 ? Math.round(((lastSell.price - avgCost) / avgCost) * 100) : 0;
     const profitable = lastSell.price > avgCost;
-    const nextStepStarter = 'When you\u2019re done selling, click <strong>Done Selling</strong>. Then head to the <strong>Travel tab</strong> to move to a new neighborhood. Once you arrive, you\u2019ll be able to buy and sell again. Each neighborhood has different prices \u2014 that\u2019s where the opportunity is!';
+    const nextStepStarter = 'When you\u2019re done selling, click <strong>Done Selling</strong>. Then head to the <strong>Map tab</strong> to move to a new neighborhood. Once you arrive, you\u2019ll be able to buy and sell again. Each neighborhood has different prices \u2014 that\u2019s where the opportunity is!';
     const nextStepFull = 'When you\u2019re done selling, click <strong>Done Selling</strong>. Then you can buy new stock on the <strong>Buy tab</strong> before traveling to the next neighborhood.';
     const nextStep = G.mode === 'starter' ? nextStepStarter : nextStepFull;
     showAdvisor(
@@ -1421,7 +1454,7 @@ function checkAdvisorContextual() {
   if (!G || G.gameOver) return false;
 
   // Wagon upgrade tip — fires regardless of tutorial completion (so Starter Mode players see it)
-  const wagonUpgrades = WAGON_UPGRADES[G.mode] || WAGON_UPGRADES.starter;
+  const wagonUpgrades = getWagonUpgrades()[G.mode] || getWagonUpgrades().starter;
   const wagonUpgrade = wagonUpgrades[G.wagonUpgradeIndex];
   const wagonUpgradeKey = 'upgrade_' + G.wagonUpgradeIndex;
   if (!advisorState.shownTips[wagonUpgradeKey] && wagonUpgrade && G.netWorth >= wagonUpgrade.threshold && G.day >= wagonUpgrade.minDay) {
@@ -1455,7 +1488,7 @@ function checkAdvisorContextual() {
     showModal({
       eventImg: SATURATION_IMG,
       title: 'Market Saturation',
-      desc: `You\u2019ve been back to <strong>${NEIGHBORHOODS[G.location].name}</strong> a lot lately. Notice your sell prices dropping there? That\u2019s called <strong>market saturation</strong> \u2014 when you flood a market with too much of your product, supply outpaces demand and prices fall. Try giving this neighborhood a break and selling somewhere else for a while.`,
+      desc: `You\u2019ve been back to <strong>${getNeighborhoods()[G.location].name}</strong> a lot lately. Notice your sell prices dropping there? That\u2019s called <strong>market saturation</strong> \u2014 when you flood a market with too much of your product, supply outpaces demand and prices fall. Try giving this neighborhood a break and selling somewhere else for a while.`,
       tip: 'Time to move! Different neighborhoods are always looking for what you\u2019re selling.'
     });
     return true;
@@ -1468,7 +1501,7 @@ function checkAdvisorContextual() {
   if (G.day === 4 && G.tipCount === 0 && !advisorState.shownTips.tipReminder) {
     advisorState.shownTips.tipReminder = true;
     showAdvisor(
-      'Quick tip: see the <strong>Market Research</strong> button on the Travel tab? For a small fee, I may be able to find out which neighborhoods have good prices right now.<br><br>It\u2019s not a guarantee \u2014 but paying for information before making a big decision is called <strong>market research</strong>, and it\u2019s one of the smartest investments you can make.',
+      'Quick tip: see the <strong>Market Research</strong> button on the Map tab? For a small fee, I may be able to find out which neighborhoods have good prices right now.<br><br>It\u2019s not a guarantee \u2014 but paying for information before making a big decision is called <strong>market research</strong>, and it\u2019s one of the smartest investments you can make.',
       'Good to know!'
     );
     return true;
@@ -1567,10 +1600,11 @@ function getEventImage(event) {
   // Check if the emoji matches an antagonist with an image
   // Skip null/undefined emojis to avoid matching the wrong antagonist (since emoji fields are now null)
   if (event.emoji) {
-    var antKeys = Object.keys(ANTAGONISTS);
+    var ants = getAntagonists();
+    var antKeys = Object.keys(ants);
     for (var i = 0; i < antKeys.length; i++) {
-      if (ANTAGONISTS[antKeys[i]].emoji === event.emoji && ANTAGONISTS[antKeys[i]].img) {
-        return '<img src="' + ANTAGONISTS[antKeys[i]].img + '" style="' + imgStyle + '">';
+      if (ants[antKeys[i]].emoji === event.emoji && ants[antKeys[i]].img) {
+        return '<img src="' + ants[antKeys[i]].img + '" style="' + imgStyle + '">';
       }
     }
     return '<div style="font-size:2.2rem;margin-bottom:6px">' + event.emoji + '</div>';
@@ -1681,7 +1715,7 @@ function render() {
     G.recentVisits = [{ location: G.location, day: 1 }];
   }
   if (G.gameOver) { renderEnd(app); return; }
-  const loc = NEIGHBORHOODS[G.location];
+  const loc = getNeighborhoods()[G.location];
   const unlocked = getUnlocked();
   const wPct = wagonPercent();
   const wClass = wPct > 90 ? 'full' : wPct > 70 ? 'warning' : '';
@@ -1723,7 +1757,7 @@ function render() {
     ${G.soldToday && G.mode === 'full' && !G.boughtHere ? '<div class="banner banner-warn"> Done selling. Buy new stock on the Buy tab, then Travel.</div>' : ''}
     ${G.soldToday && G.mode === 'full' && G.boughtHere ? '<div class="banner banner-info">Stocked up! Travel to a new neighborhood to sell.</div>' : ''}
     ${G.soldToday && G.mode === 'starter' ? '<div class="banner banner-warn"> Done selling. Travel or Stay to advance.</div>' : ''}
-    ${(() => { const c = (G.recentVisits || []).filter(v => v.location === G.location && (G.day - v.day) < 5).length; return c >= 3 ? `<div class="banner banner-warn">Market saturation in <strong>${NEIGHBORHOODS[G.location].name}</strong> \u2014 your sell prices here are down. Try selling somewhere else for a few days.</div>` : ''; })()}
+    ${(() => { const c = (G.recentVisits || []).filter(v => v.location === G.location && (G.day - v.day) < 5).length; return c >= 3 ? `<div class="banner banner-warn">Market saturation in <strong>${getNeighborhoods()[G.location].name}</strong> \u2014 your sell prices here are down. Try selling somewhere else for a few days.</div>` : ''; })()}
     ${G.upgradeBannerUntil && Date.now() < G.upgradeBannerUntil ? `<div class="banner banner-info">Wagon upgraded! Your capacity is now <strong>${G.upgradeBannerCapacity} slots</strong>. Use that extra space wisely!</div>` : ''}
     ${upgrade && !(G.hasSoldThisTurn && !G.soldToday) ? `<div class="upgrade-card"><h3>Capital Investment Opportunity!</h3><p class="text-muted">${upgrade.label}: ${G.wagonCapacity} \u2192 ${upgrade.capacity} slots capacity</p><button class="btn btn-sell" onclick="purchaseWagonUpgrade()" ${G.cash < upgrade.cost ? 'disabled' : ''}>Invest $${upgrade.cost}</button></div>` : ''}
     ${G.mode === 'starter' ? renderProgressTrack(unlocked) : ''}
@@ -1735,7 +1769,7 @@ function render() {
 }
 
 function renderProgressTrack(unlocked) {
-  return `<div class="progress-track">${PRODUCTS.map(p => {
+  return `<div class="progress-track">${getProducts().map(p => {
     const isUnlocked = unlocked.some(u=>u.id===p.id);
     const isCurrent = p.unlockDay === G.day;
     return `<div class="progress-dot ${isUnlocked?'unlocked':''} ${isCurrent?'current':''}" title="${p.emoji} ${p.name}${isUnlocked?' (unlocked)':` (Day ${p.unlockDay})`}"></div>`;
@@ -1762,7 +1796,7 @@ function renderBuyTab(unlocked) {
   if (G.mode === 'full' && G.hasSoldThisTurn && !G.soldToday) {
     return '<div class="text-center mt-2"><h3>Finish selling first</h3><p class="text-muted mt-2">Click "Done Selling" on the Sell tab. Then you can buy new stock before traveling.</p></div>';
   }
-  const loc = NEIGHBORHOODS[G.location].id;
+  const loc = getNeighborhoods()[G.location].id;
   const free = wagonFree();
   let html = '';
   html += `<div class="banner" style="background:#f5ede0;color:#6b5b4a;border:1px solid #e0d6c2;font-size:.72rem">Wagon space: ${free} of ${G.wagonCapacity} slots available</div>`;
@@ -1801,9 +1835,9 @@ function renderSellTab(unlocked) {
   if (G.mode === 'full' && !G.arrivedViaTravel) {
     const hasInv = totalInventory() > 0;
     if (!hasInv) return '<div class="text-center mt-2"><h3>No inventory to sell</h3><p class="text-muted mt-2">Buy products on the Buy tab, then travel to a new neighborhood to sell them.</p></div>';
-    return '<div class="text-center mt-2"><h3> Must travel to sell</h3><p class="text-muted mt-2">You can\'t sell where you bought. Travel to a different neighborhood first!</p><p class="text-muted" style="margin-top:8px"> Use Market Research on the Travel tab to find out where prices are good.</p></div>';
+    return '<div class="text-center mt-2"><h3> Must travel to sell</h3><p class="text-muted mt-2">You can\'t sell where you bought. Travel to a different neighborhood first!</p><p class="text-muted" style="margin-top:8px"> Use Market Research on the Map tab to find out where prices are good.</p></div>';
   }
-  const loc = NEIGHBORHOODS[G.location].id;
+  const loc = getNeighborhoods()[G.location].id;
   const hasInv = unlocked.some(p => G.inventory[p.id] > 0);
   if (!hasInv && !G.hasSoldThisTurn) return '<div class="text-center mt-2"><h3>No inventory to sell</h3><p class="text-muted mt-2">Visit the Buy tab to stock up!</p></div>';
   if (!hasInv && G.hasSoldThisTurn) return `<div class="text-center mt-2"><h3>All sold!</h3><p class="text-muted mt-2">${G.day >= G.days ? 'Final day! Confirm to see your market report.' : 'You\'ve sold everything. Confirm you\'re done, then travel.'}</p><button class="btn btn-primary btn-lg" style="width:100%;margin-top:10px" onclick="confirmDoneSelling()">${G.day >= G.days ? 'Close the Books' : 'Done Selling for Today'}</button></div>`;
@@ -1888,7 +1922,7 @@ function renderTravelTab() {
 function renderItemsTab() {
   return `<div class="flex-between mb-2"><h3>Inventory</h3><span class="text-muted">${totalInventory()} / ${G.wagonCapacity} slots</span></div>
   <div class="wagon-bar" style="margin-bottom:8px"><div class="wagon-fill ${wagonPercent()>90?'full':wagonPercent()>70?'warning':''}" style="width:${Math.min(wagonPercent(),100)}%"></div></div>
-  <div class="inv-grid">${PRODUCTS.filter(p => G.unlocked.includes(p.id)).map(p => `<div class="inv-item">
+  <div class="inv-grid">${getProducts().filter(p => G.unlocked.includes(p.id)).map(p => `<div class="inv-item">
     <div class="emoji">${p.emoji}</div>
     <div class="name">${p.name}</div>
     <div class="count">${G.inventory[p.id]}</div>
