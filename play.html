@@ -318,12 +318,12 @@ const STORM_RAIN_IMG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDA
 // ===== GAME CONFIGURATION =====
 // Each product has two price ranges: default (Full Market, Career) and starter (easier, for new players)
 const PRODUCTS = [
-  { id:'lemonade', name:'Lemonade', emoji:'🍋', buyMin:.50, buyMax:.95, sellMin:.65, sellMax:1.20, starterBuyMin:.50, starterBuyMax:.85, starterSellMin:.75, starterSellMax:1.25, unlockDay:1 },
-  { id:'water', name:'Bottled Water', emoji:'💧', buyMin:.40, buyMax:.75, sellMin:.55, sellMax:.95, starterBuyMin:.40, starterBuyMax:.70, starterSellMin:.55, starterSellMax:1.00, unlockDay:4 },
-  { id:'cookies', name:'Cookies', emoji:'🍪', buyMin:.95, buyMax:1.55, sellMin:1.20, sellMax:2.00, starterBuyMin:.95, starterBuyMax:1.45, starterSellMin:1.20, starterSellMax:2.05, unlockDay:7 },
-  { id:'candy', name:'Candy', emoji:'🍬', buyMin:.50, buyMax:.90, sellMin:.65, sellMax:1.15, starterBuyMin:.50, starterBuyMax:.85, starterSellMin:.65, starterSellMax:1.20, unlockDay:10 },
-  { id:'soda', name:'Soda Pop', emoji:'🥤', buyMin:.75, buyMax:1.25, sellMin:.95, sellMax:1.60, starterBuyMin:.75, starterBuyMax:1.20, starterSellMin:.95, starterSellMax:1.65, unlockDay:13 },
-  { id:'toys', name:'Small Toys', emoji:'🧸', buyMin:2.00, buyMax:3.30, sellMin:2.50, sellMax:4.00, starterBuyMin:2.00, starterBuyMax:3.20, starterSellMin:2.50, starterSellMax:4.10, unlockDay:15 }
+  { id:'lemonade', name:'Lemonade', emoji:'🍋', buyMin:.50, buyMax:.95, sellMin:.65, sellMax:1.20, starterBuyMin:.50, starterBuyMax:.85, starterSellMin:.75, starterSellMax:1.25, unlockDay:1, starterUnlockDay:1 },
+  { id:'water', name:'Bottled Water', emoji:'💧', buyMin:.40, buyMax:.75, sellMin:.55, sellMax:.95, starterBuyMin:.40, starterBuyMax:.70, starterSellMin:.55, starterSellMax:1.00, unlockDay:4, starterUnlockDay:1 },
+  { id:'cookies', name:'Cookies', emoji:'🍪', buyMin:.95, buyMax:1.55, sellMin:1.20, sellMax:2.00, starterBuyMin:.95, starterBuyMax:1.45, starterSellMin:1.20, starterSellMax:2.05, unlockDay:7, starterUnlockDay:4 },
+  { id:'candy', name:'Candy', emoji:'🍬', buyMin:.50, buyMax:.90, sellMin:.65, sellMax:1.15, starterBuyMin:.50, starterBuyMax:.85, starterSellMin:.65, starterSellMax:1.20, unlockDay:10, starterUnlockDay:7 },
+  { id:'soda', name:'Soda Pop', emoji:'🥤', buyMin:.75, buyMax:1.25, sellMin:.95, sellMax:1.60, starterBuyMin:.75, starterBuyMax:1.20, starterSellMin:.95, starterSellMax:1.65, unlockDay:13, starterUnlockDay:10 },
+  { id:'toys', name:'Small Toys', emoji:'🧸', buyMin:2.00, buyMax:3.30, sellMin:2.50, sellMax:4.00, starterBuyMin:2.00, starterBuyMax:3.20, starterSellMin:2.50, starterSellMax:4.10, unlockDay:15, starterUnlockDay:13 }
 ];
 
 const NEIGHBORHOODS = [
@@ -501,6 +501,8 @@ function newGame(mode) {
     locationsVisited:{}, productsBought:{}, productsSold:{},
     // Savings / Banking
     savings:0, totalInterestEarned:0, savingsHistory:[], weeksSaved:0, totalWeeks:0, bankVisitShown:false,
+    // v17c: Character familiarity flags (persist across Full Market -> Career carryover)
+    metRamos: false, metMaeve: false,
     // Calibration result
     calSkill: 0,
     // Career Mode
@@ -520,6 +522,14 @@ function startCareerMode(carryOver) {
   const prevWagon = carryOver.wagonCapacity;
   const prevUpgradeIndex = carryOver.wagonUpgradeIndex;
   const prevAvgBuy = carryOver.avgBuyPrice;
+  // v17c: also carry savings discipline + character familiarity
+  const prevSavings = carryOver.savings || 0;
+  const prevTotalInterest = carryOver.totalInterestEarned || 0;
+  const prevSavingsHistory = Array.isArray(carryOver.savingsHistory) ? carryOver.savingsHistory : [];
+  const prevWeeksSaved = carryOver.weeksSaved || 0;
+  const prevBestProfitStreak = carryOver.bestProfitStreak || 0;
+  const prevMetRamos = !!carryOver.metRamos;
+  const prevMetMaeve = !!carryOver.metMaeve;
 
   G = {
     mode: 'full', days: 30, day: 1, cash: prevCash, location: 0,
@@ -537,10 +547,13 @@ function startCareerMode(carryOver) {
     avgBuyPrice: { ...prevAvgBuy },
     activeTab: 'buy', gameOver: false, lastEvent: null,
     locationsVisited: {}, productsBought: {}, productsSold: {},
-    savings:0, totalInterestEarned:0, savingsHistory:[], weeksSaved:0, totalWeeks:0, bankVisitShown:false,
+    // v17c: savings + character familiarity now carry over
+    savings: prevSavings, totalInterestEarned: prevTotalInterest, savingsHistory: prevSavingsHistory,
+    weeksSaved: prevWeeksSaved, totalWeeks: 0, bankVisitShown: false,
+    metRamos: prevMetRamos, metMaeve: prevMetMaeve,
     calSkill: 0.3,
     // Career Mode fields
-    isCareer: true, careerLevel: '1-1', profitStreak: 0, bestProfitStreak: 0
+    isCareer: true, careerLevel: '1-1', profitStreak: 0, bestProfitStreak: prevBestProfitStreak
   };
   // Copy inventory
   getProducts().forEach(p => { G.inventory[p.id] = prevInventory[p.id] || 0; });
@@ -550,12 +563,34 @@ function startCareerMode(carryOver) {
   updateNetWorth();
   G.netWorthHistory = [G.netWorth];
   render();
-  showModal({
-    type: 'career_start', title: 'Career Mode: The Hustle',
-    desc: 'You\u2019ve proven you can run a business. Now prove you can run it well. This is a new 30-day season \u2014 same market, higher expectations. Earn an A grade to advance to Level 1-2.',
-    emoji: null,
-    tip: 'Your cash and inventory carried over. The market adapts to experienced players. Focus on margin discipline, diversification, and smart market research.'
-  });
+  // v17c: Maeve greets the player at Career entry instead of the generic system modal.
+  // Two branches based on whether the player has met Maeve in a previous season.
+  // In v17b/v17c the only Career entry path is via Full Market -> unlock card, so
+  // prevMetMaeve will reliably be true. The non-returning branch is kept for
+  // future direct-Career entry paths (curriculum launches, classroom assignments).
+  const bizName = playerInfo.businessName || 'your business';
+  const playerNameLocal = playerInfo.playerName || 'friend';
+  if (prevMetMaeve) {
+    let careerMsg =
+      'You did it! <strong>' + bizName + '</strong> made it through Full Market with flying colors \u2014 that\u2019s why you\u2019re here.<br><br>' +
+      'This is <strong>Career Mode, Level 1-1: The Hustle</strong>. It\u2019s a brand-new 30-day season, same neighborhoods, same products \u2014 but the bar is higher now. You need an <strong>A grade</strong> to advance to Level 1-2.';
+    if (prevSavings > 0) {
+      careerMsg += '<br><br>The good news: <strong>everything came with you</strong>. Your cash, your wagon, and your savings with Mr. Ramos \u2014 all <strong>$' + prevSavings.toFixed(2) + '</strong> of it. He\u2019ll be back on Day 5 like always.';
+    } else {
+      careerMsg += '<br><br>Your cash, your wagon, and everything you built carried over. Mr. Ramos will be back on Day 5 like always \u2014 maybe this season is when we get serious about saving!';
+    }
+    careerMsg += '<br><br>Ready, ' + playerNameLocal + '? Let\u2019s go!';
+    showAdvisor(careerMsg, 'Let\u2019s do this!');
+  } else {
+    // Future-proofing: direct Career start without prior Full Market exposure.
+    const careerMsg =
+      'Welcome to <strong>' + bizName + '</strong>! I\u2019m Maeve, and I\u2019ll be your business advisor.<br><br>' +
+      'This is <strong>Career Mode, Level 1-1: The Hustle</strong> \u2014 a 30-day season where you buy products, travel to other neighborhoods, and sell for a profit. Earn an <strong>A grade</strong> to advance to Level 1-2.<br><br>' +
+      'Every week, my friend <strong>Mr. Ramos</strong> from the bank will stop by to help you manage your earnings. You\u2019ll meet him on Day 5.<br><br>' +
+      'Let\u2019s start with your first purchase \u2014 click the <strong>Buy tab</strong> and load up your wagon!';
+    showAdvisor(careerMsg, 'Let\u2019s get started!');
+    G.metMaeve = true; // mark first contact in this direct-start path
+  }
 }
 
 // ===== PERSISTENCE =====
@@ -617,13 +652,18 @@ function wagonFree() { return G.wagonCapacity - totalInventory(); }
 function wagonPercent() { return (totalInventory() / G.wagonCapacity) * 100; }
 
 // ===== UNLOCKED PRODUCTS =====
+// Returns the unlock day appropriate for the current mode.
+// Starter Mode uses starterUnlockDay (a faster ramp); Full Market and Career use unlockDay.
+function unlockDayFor(p) {
+  return G.mode === 'starter' ? p.starterUnlockDay : p.unlockDay;
+}
 function getUnlocked() {
   if (G.mode === 'full') return getProducts();
-  return getProducts().filter(p => G.day >= p.unlockDay);
+  return getProducts().filter(p => G.day >= unlockDayFor(p));
 }
 function checkNewUnlocks() {
   if (G.mode !== 'starter') return null;
-  const newly = getProducts().filter(p => p.unlockDay === G.day && !G.unlocked.includes(p.id));
+  const newly = getProducts().filter(p => unlockDayFor(p) === G.day && !G.unlocked.includes(p.id));
   newly.forEach(p => G.unlocked.push(p.id));
   return newly.length > 0 ? newly : null;
 }
@@ -1054,6 +1094,10 @@ function showBankVisit() {
   // value, which were not 'earned' and shouldn't be available for savings.
   const MIN_PROFIT_TO_SAVE = 5; // below this, skip the savings ask
   const isFirst = G.totalWeeks === 1;
+  // v17c: A "returning" visit is the first bank visit of a new season (Career or replay)
+  // for a player who has met Mr. Ramos in a previous season. This drives a warm
+  // continuity greeting instead of a full reintroduction.
+  const isReturning = isFirst && G.metRamos;
   const isFinal = G.day + 5 > G.days;
   const playerName = playerInfo.playerName || 'friend';
   const canSaveThisWeek = weekProfit >= MIN_PROFIT_TO_SAVE;
@@ -1070,7 +1114,25 @@ function showBankVisit() {
 
   // Build intro text
   let introText = '';
-  if (isFirst) {
+  if (isReturning) {
+    // v17c: Player has met Mr. Ramos in a previous season (Full Market or prior Career).
+    // Acknowledge continuity: their balance carried over, their interest record is intact.
+    const carriedSavings = G.savings - interest; // what they had walking into this season, before this week's interest
+    const totalInt = G.totalInterestEarned || 0;
+    introText = '<p>Good to see you again, ' + playerName + '! Your account came right over with you \u2014 nothing was lost.</p>';
+    if (carriedSavings > 0) {
+      introText += '<p>You\u2019re starting this season with <strong>$' + carriedSavings.toFixed(2) + '</strong> in savings. ';
+      if (totalInt > 0) {
+        introText += 'Across all your seasons, you\u2019ve earned <strong>$' + totalInt.toFixed(2) + '</strong> in interest just by keeping money saved with us. That\u2019s your money working for you, week after week.</p>';
+      } else {
+        introText += 'Keep that habit going \u2014 small consistent saving compounds over time.</p>';
+      }
+      introText += '<p>Ready to keep building?</p>';
+    } else {
+      introText += '<p>You\u2019ve got a fresh start on the savings side this season. Same rules apply: save from <strong>profit</strong>, not cash on hand, and the bank pays you <strong>2% weekly interest</strong> on whatever you keep with us.</p>' +
+        '<p>Let\u2019s see what this week looks like.</p>';
+    }
+  } else if (isFirst) {
     introText = '<p>Welcome, ' + playerName + '! I\u2019m <strong>Mr. Carlos Ramos</strong> from Community First Credit Union. Every week I\u2019ll stop by to check on your business and help you think about your finances.</p>';
     if (canSaveThisWeek) {
       introText += '<p>One of the smartest things a business owner can do is put some of their <strong>profit</strong> into a <strong>savings account</strong>. Profit is what\u2019s left over after you pay your business expenses \u2014 it\u2019s the money you actually <em>earned</em> this week. When you put profit into savings, the bank pays you a little extra each week. That\u2019s called <strong>interest</strong> \u2014 your money earning money.</p>' +
@@ -1082,6 +1144,8 @@ function showBankVisit() {
       introText += '<p>Tough first week, ' + playerName + ' \u2014 happens to every business owner. The good news is your business is still standing, and we\u2019ll get there.</p>' +
         '<p>One concept worth knowing for next time: you save from <strong>profit</strong>, not from cash on hand. Profit is what\u2019s left over after expenses \u2014 the money you actually earned. When you have a profitable week, that\u2019s when we talk savings.</p>';
     }
+    // v17c: Mark that the player has now met Mr. Ramos (persists across season carryovers).
+    G.metRamos = true;
   } else if (isFinal) {
     if (G.savings > 0) {
       introText = '<p>Great to see you one last time, ' + playerName + '! Here\u2019s your final savings report. Every dollar you saved earned interest, and every week you chose to save was a week your money grew on its own.</p>';
@@ -1231,7 +1295,15 @@ function beginCareerMode() {
     inventory: { ...G.inventory },
     wagonCapacity: G.wagonCapacity,
     wagonUpgradeIndex: G.wagonUpgradeIndex,
-    avgBuyPrice: { ...G.avgBuyPrice }
+    avgBuyPrice: { ...G.avgBuyPrice },
+    // v17c: Carry savings discipline + character familiarity into Career Mode
+    savings: G.savings || 0,
+    totalInterestEarned: G.totalInterestEarned || 0,
+    savingsHistory: Array.isArray(G.savingsHistory) ? [...G.savingsHistory] : [],
+    weeksSaved: G.weeksSaved || 0,
+    bestProfitStreak: G.bestProfitStreak || 0,
+    metRamos: !!G.metRamos,
+    metMaeve: !!G.metMaeve
   };
   startCareerMode(carryOver);
 }
@@ -1243,7 +1315,15 @@ function replayCareerSeason() {
     inventory: { ...G.inventory },
     wagonCapacity: G.wagonCapacity,
     wagonUpgradeIndex: G.wagonUpgradeIndex,
-    avgBuyPrice: { ...G.avgBuyPrice }
+    avgBuyPrice: { ...G.avgBuyPrice },
+    // v17c: Carry savings discipline + character familiarity across replay
+    savings: G.savings || 0,
+    totalInterestEarned: G.totalInterestEarned || 0,
+    savingsHistory: Array.isArray(G.savingsHistory) ? [...G.savingsHistory] : [],
+    weeksSaved: G.weeksSaved || 0,
+    bestProfitStreak: G.bestProfitStreak || 0,
+    metRamos: !!G.metRamos,
+    metMaeve: !!G.metMaeve
   };
   startCareerMode(carryOver);
 }
@@ -1394,6 +1474,7 @@ function checkAdvisorTutorial() {
   // Step 0: Welcome — shown right after game starts (day 1, before any action)
   if (step === 0 && G.day === 1 && !G.hasSoldThisTurn && !G.soldToday && G.sellHistory.length === 0 && G.buyHistory.length === 0) {
     advisorState.tutorialStep = 1;
+    G.metMaeve = true; // v17c: persist across Full Market -> Career carryover
     const bizName = playerInfo.businessName || 'your business';
     if (G.mode === 'starter') {
       showAdvisor(
@@ -1771,8 +1852,9 @@ function render() {
 function renderProgressTrack(unlocked) {
   return `<div class="progress-track">${getProducts().map(p => {
     const isUnlocked = unlocked.some(u=>u.id===p.id);
-    const isCurrent = p.unlockDay === G.day;
-    return `<div class="progress-dot ${isUnlocked?'unlocked':''} ${isCurrent?'current':''}" title="${p.emoji} ${p.name}${isUnlocked?' (unlocked)':` (Day ${p.unlockDay})`}"></div>`;
+    const showDay = unlockDayFor(p);
+    const isCurrent = showDay === G.day;
+    return `<div class="progress-dot ${isUnlocked?'unlocked':''} ${isCurrent?'current':''}" title="${p.emoji} ${p.name}${isUnlocked?' (unlocked)':` (Day ${showDay})`}"></div>`;
   }).join('')}</div>`;
 }
 
