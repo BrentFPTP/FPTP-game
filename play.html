@@ -234,7 +234,7 @@ canvas{width:100%;height:120px}
 // ===== BUILD FLAG =====
 // PUBLIC_BUILD = true: ships as Free version (Starter + Full Market only, Career Mode hidden + locked)
 // PUBLIC_BUILD = false: dev build with full Career Mode access
-const PUBLIC_BUILD = true;
+const PUBLIC_BUILD = true; 
 
 // ===== GLOBAL ERROR BOUNDARY (Item #33, v17d) =====
 // Catches any uncaught JavaScript error and presents a graceful message
@@ -2334,10 +2334,15 @@ function renderEnd(app) {
   setTimeout(drawEndChart, 100);
 }
 
-// ===== SESSION REPORT (Item #9, v17d Plan B fallback) =====
-// Print-optimized report for teachers/parents. v17d ships scaffolding + 2 metrics
-// (Margin Discipline, Information Use). v17e will add Decision Quality Under
-// Pressure + Risk Response + polished Maeve narrative and print styles.
+// ===== SESSION REPORT (Item #9, Plan B fallback — completed v17e) =====
+// Print-optimized report for teachers/parents.
+// v17d shipped: scaffolding + Margin Discipline + Information Use + vocab recap.
+// v17e completes Item #9: adds Decision Quality Under Pressure (Metric B, simpler
+// approximation per Plan B scope — sophisticated decision-point logging deferred to
+// Dashboard build) + Risk Response (Metric D, original brief version — Decision
+// Coherence reframe deferred to Dashboard v1.1) + plain-language inline synthesis
+// (no character voice; Maeve-voice narrative removed per NarrativeAndLore §2.1).
+// Print-formatting orphan deliberately not fixed (workaround, not product).
 function renderSessionReport(app) {
   const grade = getGrade();
   const startingNW = G.netWorthHistory[0] || 50;
@@ -2377,20 +2382,33 @@ function renderSessionReport(app) {
         detail: 'Worth talking through what a profitable margin looks like and how to spot one before selling.'
       };
     }
+    // Build session-wide context to append to the three "recovered" headlines. This
+    // prevents the in-card impression that first-loss recovery alone tells the full
+    // margin story — see v17e fix: when losses cluster later in the session, the
+    // first-loss-recovery framing under-reports the actual pattern.
+    const totalSales = sells.length;
+    const profitableSales = totalSales - lossCount;
+    const sessionContext = lossCount === 1
+      ? ` Across the full session, ${profitableSales} of ${totalSales} sales were profitable.`
+      : ` Across the full session, ${profitableSales} of ${totalSales} sales were profitable (${lossCount} ended in a loss).`;
     if (recoveryTrades === 1) {
       return {
-        headline: `${name} recovered immediately after their first losing trade.`,
-        detail: `Strong margin discipline — they caught the mistake and adjusted on the very next sale.`
+        headline: `${name} recovered immediately after their first losing trade.${sessionContext}`,
+        detail: lossCount === 1
+          ? `Strong margin discipline — they caught the mistake and adjusted on the very next sale.`
+          : `They adjusted quickly after the first loss, though additional losses occurred later in the session.`
       };
     }
     if (recoveryTrades <= 2) {
       return {
-        headline: `${name} recovered quickly from their first losing trade — within ${recoveryTrades} trades.`,
-        detail: 'Good margin discipline. They noticed the mistake and adjusted.'
+        headline: `${name} recovered quickly from their first losing trade — within ${recoveryTrades} trades.${sessionContext}`,
+        detail: lossCount === 1
+          ? 'Good margin discipline. They noticed the mistake and adjusted.'
+          : 'They adjusted after the first loss, though additional losses occurred later in the session.'
       };
     }
     return {
-      headline: `${name} took ${recoveryTrades} trades to return to a profitable sale after their first loss.`,
+      headline: `${name} took ${recoveryTrades} trades to return to a profitable sale after their first loss.${sessionContext}`,
       detail: 'Slower recovery. Worth checking in on how they decide what a fair selling price is.'
     };
   }
@@ -2446,8 +2464,179 @@ function renderSessionReport(app) {
     };
   }
 
+  // === Metric B: Decision Quality Under Pressure ===
+  // "When prices were bad in her current neighborhood, did she travel to find a better
+  // market, or did she sell at a loss to clear inventory?"
+  //
+  // PLAN B SCOPE NOTE: The Dashboard Brief spec for Metric B requires per-decision-point
+  // logging (every moment the player held losing inventory while a better market existed).
+  // The current game does not log non-sells, so Plan B uses the simpler approximation:
+  // for each sale flagged as a loss, check whether a positive-margin alternative existed
+  // at another unlocked neighborhood that day. This measures the loss-sales only, not
+  // held-and-traveled decisions. Proper spec deferred to Dashboard build with decisionPoints.
+  function computeDecisionQuality() {
+    const sells = G.sellHistory || [];
+    const losses = sells.filter(s => s.isLoss);
+    if (losses.length === 0) {
+      // Either zero sales or all profitable. Distinguish the two for the adult reader.
+      if (sells.length === 0) {
+        return { headline: 'Not enough sales to measure this session.', detail: '' };
+      }
+      return {
+        headline: `${name} never had to sell at a loss this session.`,
+        detail: 'No high-pressure pricing decisions arose — every sale was profitable.'
+      };
+    }
+    // For each losing sale, was a better-margin location available that day?
+    const neighborhoods = getNeighborhoods();
+    let alternativeExisted = 0;
+    losses.forEach(s => {
+      const sellCost = s.avgCost;
+      if (!sellCost || sellCost <= 0) return;
+      // A "better-margin alternative" is any other unlocked neighborhood where the sell
+      // price for this product was higher than the avg cost (i.e., positive margin).
+      const hasBetter = neighborhoods.some(n => {
+        if (n.id === undefined) return false;
+        const priceObj = G.prices && G.prices[n.id] && G.prices[n.id][s.product];
+        if (!priceObj) return false;
+        // Skip the location they actually sold at (we already know it was a loss there).
+        // Note: sellHistory records price, not location, so we approximate by skipping
+        // locations whose current sell price matches the recorded sale price exactly.
+        // If two locations happen to have identical prices that day, this slightly
+        // overcounts. Acceptable for Plan B-scope approximation.
+        if (Math.abs(priceObj.sell - s.price) < 0.005) return false;
+        return priceObj.sell > sellCost;
+      });
+      if (hasBetter) alternativeExisted++;
+    });
+    const totalLosses = losses.length;
+    if (alternativeExisted === 0) {
+      return {
+        headline: `${name} had ${totalLosses} losing sale${totalLosses === 1 ? '' : 's'} this session, but no clearly better market was available at the time.`,
+        detail: 'Sometimes a loss is the best of bad options. Worth noting they did not have easy alternatives.'
+      };
+    }
+    if (alternativeExisted === totalLosses) {
+      return {
+        headline: `${name} sold at a loss ${totalLosses} time${totalLosses === 1 ? '' : 's'} when a better-margin neighborhood was available.`,
+        detail: 'A good conversation to have: traveling to find a profitable market is often worth the time it costs.'
+      };
+    }
+    return {
+      headline: `${name} sold at a loss ${totalLosses} time${totalLosses === 1 ? '' : 's'}; a better-margin location was available ${alternativeExisted} of those times.`,
+      detail: 'Mixed picture. Some loss-sales were unavoidable; others had alternatives worth exploring next session.'
+    };
+  }
+
+  // === Metric D: Risk Response ===
+  // "When something bad happened — a fine, a competitor, weather — did she make the
+  // smart choice to limit damage?"
+  //
+  // CANON NOTE: This is the original Dashboard Brief v1 Metric D (loss-minimizing
+  // option). The v1.1 reframe to Decision Coherence (situational appropriateness) is
+  // deferred to Dashboard Phase A. Plan B uses the v1 version.
+  //
+  // Smart choices, per the in-game cost structure:
+  //   crawley1: choice 0 (mow lawn, $3 + goodwill) is smarter than choice 1 (60% chance of $5 fine).
+  //   davis2:   choice 0 (fix now for $5) is smarter than choice 1 (risk $10 fine tomorrow).
+  //   eddie1:   choice 1 (pay $8 to leave) is smarter than choice 0 (compete) WHEN AFFORDABLE.
+  //             If player had less than $8, "compete" is the only option and is not penalized.
+  // The Eddie affordability check uses choice 0 dispatch: in handleEventChoice, if a
+  // player picks pay-off but lacks $8, the game shows "Can't Afford It" and they end up
+  // competing anyway. We can't perfectly reconstruct cash-at-time-of-choice from logs,
+  // so we treat Eddie's "compete" as N/A (not counted) — this avoids unfairly penalizing
+  // a player who had no real choice. Slight under-count of risk-literacy is acceptable.
+  function computeRiskResponse() {
+    const choices = eventChoices || {};
+    const scored = [];
+    // crawley1
+    if (choices.crawley1 !== undefined) {
+      scored.push({ event: 'Mrs. Crawley', smart: choices.crawley1 === 0 });
+    }
+    // davis2
+    if (choices.davis2 !== undefined) {
+      scored.push({ event: 'Inspector Davis', smart: choices.davis2 === 0 });
+    }
+    // eddie1 — only count if player chose to pay (choice 1). Choice 0 (compete) is N/A.
+    if (choices.eddie1 === 1) {
+      scored.push({ event: 'Slick Eddie', smart: true });
+    }
+    if (scored.length === 0) {
+      return {
+        headline: `${name} did not face choice-driven challenges this session.`,
+        detail: 'Antagonists and events did not present decision points, or none triggered.'
+      };
+    }
+    const smartCount = scored.filter(s => s.smart).length;
+    const totalCount = scored.length;
+    if (smartCount === totalCount) {
+      const allSmartHeadline = totalCount === 1
+        ? `${name} faced 1 challenge and picked the loss-minimizing option.`
+        : `${name} faced ${totalCount} challenges and picked the loss-minimizing option every time.`;
+      return {
+        headline: allSmartHeadline,
+        detail: 'Strong risk literacy. Demonstrated awareness that proactive choices usually cost less than reactive ones.'
+      };
+    }
+    if (smartCount === 0) {
+      const missed = scored.map(s => s.event).join(', ');
+      return {
+        headline: `${name} faced ${totalCount} challenge${totalCount === 1 ? '' : 's'} and chose the riskier option each time (${missed}).`,
+        detail: 'Worth talking through what each event actually cost vs. what the safer choice would have cost.'
+      };
+    }
+    const missed = scored.filter(s => !s.smart).map(s => s.event).join(', ');
+    return {
+      headline: `${name} faced ${totalCount} challenge${totalCount === 1 ? '' : 's'} and picked the loss-minimizing option in ${smartCount} of them.`,
+      detail: `The one${totalCount - smartCount === 1 ? '' : 's'} worth revisiting: ${missed}.`
+    };
+  }
+
   const marginMetric = computeMarginDiscipline();
   const infoMetric = computeInformationUse();
+  const decisionMetric = computeDecisionQuality();
+  const riskMetric = computeRiskResponse();
+
+  // === Plain-language synthesis (replaces v17d Maeve-voice narrative per canon) ===
+  // Inline 1-2 sentence summary derived from the four metric outputs. No character voice.
+  // Goal: a parent or teacher reading only this paragraph still knows the actionable takeaway.
+  function buildSynthesis() {
+    // Identify strongest and weakest metrics by simple keyword heuristics on the headlines.
+    // We avoid a numeric scoring layer — Plan B is plain language all the way down.
+    //
+    // Margin Discipline weak signals:
+    //   - "did not return" / "took N trades" — slow or no recovery (pre-existing)
+    //   - "(N ended in a loss)" with N >= 2 — session-wide lossiness even after a quick
+    //     first-loss recovery. Added in v17e fix so the synthesis catches the case where
+    //     recovery looks good in isolation but losses clustered later in the session.
+    const marginHasMultipleLosses = (() => {
+      const m = marginMetric.headline.match(/\((\d+) ended in a loss\)/);
+      return m && parseInt(m[1], 10) >= 2;
+    })();
+    const metrics = [
+      { name: 'margin discipline', headline: marginMetric.headline, weak: /did not return|took \d+ trades/.test(marginMetric.headline) || marginHasMultipleLosses },
+      { name: 'patience under price pressure', headline: decisionMetric.headline, weak: /was available\b/.test(decisionMetric.headline) && !/no clearly better/.test(decisionMetric.headline) },
+      { name: 'use of market research', headline: infoMetric.headline, weak: /did not act|could be stronger|did not buy/.test(infoMetric.headline) },
+      { name: 'risk response', headline: riskMetric.headline, weak: /riskier option|in \d+ of/.test(riskMetric.headline) && !/every time|picked the loss-minimizing option\.$/.test(riskMetric.headline) },
+    ];
+    const strengths = metrics.filter(m => !m.weak).map(m => m.name);
+    const focus = metrics.filter(m => m.weak).map(m => m.name);
+    if (focus.length === 0 && strengths.length > 0) {
+      return `${name} showed strength across all four behavioral measures this session. The grade reflects the financial outcome; these measures show ${name === 'Player' ? 'they are' : 'they are'} also building the habits behind it.`;
+    }
+    if (focus.length > 0 && strengths.length === 0) {
+      return `The four measures suggest ${name} is still building the underlying habits. The most useful place to start a conversation next session: ${focus[0]}.`;
+    }
+    if (focus.length === 1) {
+      return `${name}'s strongest area was ${strengths[0]}. The one area most worth a brief conversation before next session: ${focus[0]}.`;
+    }
+    if (focus.length === 2) {
+      return `${name}'s strongest area was ${strengths[0]}. Two areas to focus on next session: ${focus[0]} and ${focus[1]}.`;
+    }
+    // 3+ focus areas
+    return `Several areas to work on next session — the most useful place to start: ${focus[0]}. A short conversation about why the loss-minimizing choice is usually the cheaper choice often moves multiple of these at once.`;
+  }
+  const synthesis = buildSynthesis();
 
   // === Vocabulary recap ===
   // Reuses generateVocabRecap() data (Layer 2 of VocabularyFramework) but rebuilds the
@@ -2505,21 +2694,31 @@ function renderSessionReport(app) {
       </div>
     </div>
 
-    <h3 style="margin:14px 0 6px;color:#4a3a2a">What ${name} Did Well</h3>
+    <h3 style="margin:14px 0 6px;color:#4a3a2a">Behavioral Measures</h3>
     <div class="lesson-card" style="border-left-color:#5a7a4a">
       <div style="font-weight:700;font-size:.82rem;margin-bottom:4px">Margin Discipline</div>
       <div style="font-size:.78rem;line-height:1.5">${marginMetric.headline}</div>
       ${marginMetric.detail ? `<div style="font-size:.76rem;color:#5a4a3a;margin-top:4px;font-style:italic">${marginMetric.detail}</div>` : ''}
     </div>
     <div class="lesson-card" style="border-left-color:#5a7a4a">
+      <div style="font-weight:700;font-size:.82rem;margin-bottom:4px">Decision Quality Under Pressure</div>
+      <div style="font-size:.78rem;line-height:1.5">${decisionMetric.headline}</div>
+      ${decisionMetric.detail ? `<div style="font-size:.76rem;color:#5a4a3a;margin-top:4px;font-style:italic">${decisionMetric.detail}</div>` : ''}
+    </div>
+    <div class="lesson-card" style="border-left-color:#5a7a4a">
       <div style="font-weight:700;font-size:.82rem;margin-bottom:4px">Information Use</div>
       <div style="font-size:.78rem;line-height:1.5">${infoMetric.headline}</div>
       ${infoMetric.detail ? `<div style="font-size:.76rem;color:#5a4a3a;margin-top:4px;font-style:italic">${infoMetric.detail}</div>` : ''}
     </div>
+    <div class="lesson-card" style="border-left-color:#5a7a4a">
+      <div style="font-weight:700;font-size:.82rem;margin-bottom:4px">Risk Response</div>
+      <div style="font-size:.78rem;line-height:1.5">${riskMetric.headline}</div>
+      ${riskMetric.detail ? `<div style="font-size:.76rem;color:#5a4a3a;margin-top:4px;font-style:italic">${riskMetric.detail}</div>` : ''}
+    </div>
 
     <h3 style="margin:14px 0 6px;color:#4a3a2a">What To Focus On Next Session</h3>
-    <div class="lesson-card" style="font-size:.78rem;line-height:1.5;color:#7a6a58;font-style:italic">
-      Two more behavioral measures (Decision Quality Under Pressure and Risk Response) will appear here in the next update.
+    <div class="lesson-card" style="font-size:.78rem;line-height:1.5;color:#4a3a2a">
+      ${synthesis}
     </div>
 
     ${vocabItems.length > 0 ? `<h3 style="margin:14px 0 6px;color:#4a3a2a">Words ${name} Used This Session</h3>
