@@ -31,6 +31,8 @@ h3{font-size:.88rem;font-weight:700;color:#6b5b4a}
 .status-bar .stat-label{opacity:.75;font-size:.68rem;text-transform:uppercase;letter-spacing:.3px}
 .status-bar .stat-value{font-weight:800}
 .status-bar .location-row{grid-column:1/-1;text-align:center;font-size:.82rem;padding-top:3px;border-top:1px solid rgba(255,255,255,.2);margin-top:1px}
+.goal-line{background:#fff7e6;border:2px dashed #c8a05a;border-radius:8px;padding:6px 10px;margin-bottom:6px;text-align:center;font-family:'Patrick Hand',cursive;font-size:.92rem;font-weight:700;color:#8a6a2a;letter-spacing:.2px}
+.goal-line .goal-arrow{color:#b85c2a;font-weight:800;margin:0 2px}
     .location-card {
       background: #fbf6e9;
       color: #3a3228;
@@ -151,6 +153,10 @@ canvas{width:100%;height:120px}
 .mode-card:hover::before{opacity:1}
 .mode-card.selected{border-color:#4a6a3a;background:#f0f8e8}
 .mode-card h3{font-family:'Patrick Hand',cursive;font-size:1.1rem;margin-bottom:4px;color:#4a3a2a}.mode-card p{font-size:.76rem;color:#6b5b4a;line-height:1.4}
+.preview-card{display:flex;align-items:center;gap:12px;background:#fff;border:2px solid #e0d6c2;border-radius:12px;padding:12px 14px;margin:8px 0}
+.preview-emoji{font-size:2rem;flex-shrink:0;width:44px;text-align:center}
+.preview-title{font-family:'Patrick Hand',cursive;font-size:1.05rem;color:#4a6a3a;font-weight:700}
+.preview-desc{font-size:.82rem;color:#6b5b4a;line-height:1.4;margin-top:2px}
 .mode-detail{font-size:.76rem;color:#5a4a3a;margin:3px 0;line-height:1.3}
 .mode-detail .label{font-weight:700;color:#6b5b4a}
 .mode-list{margin:4px 0 4px 16px;padding:0}
@@ -234,7 +240,7 @@ canvas{width:100%;height:120px}
 // ===== BUILD FLAG =====
 // PUBLIC_BUILD = true: ships as Free version (Starter + Full Market only, Career Mode hidden + locked)
 // PUBLIC_BUILD = false: dev build with full Career Mode access
-const PUBLIC_BUILD = true; 
+const PUBLIC_BUILD = true;
 
 // ===== GLOBAL ERROR BOUNDARY (Item #33, v17d) =====
 // Catches any uncaught JavaScript error and presents a graceful message
@@ -382,7 +388,7 @@ const ANTAGONISTS = {
 const EVENTS = [
   // Mrs. Crawley
   { id:'crawley1', ant:'crawley', eventImg: CRAWLEY_COMPLAIN_IMG, name:'Mrs. Crawley is Complaining!', desc:'Mrs. Crawley is upset about your stand and threatening to call the city. You have a choice: take time to mow her lawn (it costs you about $3 in lost sales time) and earn her goodwill, or ignore her and risk a $5 city fine.', effect:'choice_crawley', minDay:1, tip:'How you handle complaints has real consequences. Investing in community relationships often costs less than the alternative.' },
-  { id:'crawley2', ant:'crawley', eventImg: CRAWLEY_LUCKY_IMG, name:'Permit Problems', desc:'Mrs. Crawley reported you for operating without a permit. A permit is official permission to run a business \u2014 and not having one means a $5 fine!', effect:'fine', value:5, minDay:3, tip:'Licensing and permits are a cost of doing business. Smart owners factor compliance costs into their budget.' },
+  { id:'crawley2', ant:'crawley', eventImg: CRAWLEY_LUCKY_IMG, name:'Permit Problems', desc:'Mrs. Crawley pointed out that your stand needs a <strong>permit</strong> \u2014 that\u2019s official permission from the city to run a business. You didn\u2019t know yet, so this time it\u2019s just a small $5 reminder fee. Now you know to budget for one as your business grows!', effect:'fine', value:5, minDay:3, tip:'Permits and licenses are a normal cost of doing business. Smart owners plan for them ahead of time instead of being caught by surprise.' },
   { id:'crawley3', ant:'crawley', eventImg: CRAWLEY_RALLY_IMG, name:'Rallied the Neighbors', desc:'Mrs. Crawley organized a boycott \u2014 that\u2019s when people agree to stop buying from you. Sell prices are halved at this location today.', effect:'half_sell', minDay:8, tip:'A boycott is a form of community pressure. Your reputation affects your revenue. In business, this is called brand risk.' },
   // Inspector Davis
   { id:'davis1', ant:'davis', eventImg: DAVIS_INSPECTING_IMG, name:'Surprise Inspection!', desc:'Inspector Davis is conducting a compliance audit \u2014 checking whether your business meets health and safety regulations!', effect:'lose_inv', value:.30, minDay:3, tip:'Regulatory compliance means following the rules set by authorities. Failing an audit can cost you inventory, time, or money.' },
@@ -516,6 +522,10 @@ let G = {};
 
 function newGame(mode) {
   eventChoices = {};
+  // v17f: clear any modal queue state so a prior session can't leak a stale
+  // queued pop-up into a fresh game.
+  modalQueue = [];
+  modalVisible = false;
   const days = mode === 'starter' ? 15 : 30;
   G = {
     mode, days, day:1, cash:50, location:0,
@@ -869,30 +879,31 @@ function advanceDay(skipEvent) {
   // Saturation handling moved to render path (checkAdvisorContextual reads G.recentVisits)
   render();
   if (G.lastEvent) {
-    if (G.lastEvent.type === 'choice_crawley') {
-      showChoiceModal(G.lastEvent.title, G.lastEvent.emoji, G.lastEvent.desc, G.lastEvent.tip, [
+    const ev = G.lastEvent;
+    if (ev.type === 'choice_crawley') {
+      enqueueModal('event', function() { showChoiceModal(ev.title, ev.emoji, ev.desc, ev.tip, [
         { id: 'crawley1', label: 'Mow her lawn (costs $3 in time) \u2014 earn goodwill' },
         { id: 'crawley1', label: '\u274C Ignore her \u2014 risk a $5 fine' }
-      ], G.lastEvent.eventImg);
-    } else if (G.lastEvent.type === 'choice_eddie') {
-      showChoiceModal(G.lastEvent.title, G.lastEvent.emoji, G.lastEvent.desc, G.lastEvent.tip, [
+      ], ev.eventImg); });
+    } else if (ev.type === 'choice_eddie') {
+      enqueueModal('event', function() { showChoiceModal(ev.title, ev.emoji, ev.desc, ev.tip, [
         { id: 'eddie1', label: 'Stay and compete at lower prices' },
         { id: 'eddie1', label: 'Pay Eddie $8 to leave' }
-      ], G.lastEvent.eventImg);
-    } else if (G.lastEvent.type === 'choice_compliance') {
-      showChoiceModal(G.lastEvent.title, G.lastEvent.emoji, G.lastEvent.desc, G.lastEvent.tip, [
+      ], ev.eventImg); });
+    } else if (ev.type === 'choice_compliance') {
+      enqueueModal('event', function() { showChoiceModal(ev.title, ev.emoji, ev.desc, ev.tip, [
         { id: 'davis2', label: ' Fix it now for $5 (proactive)' },
         { id: 'davis2', label: '\u23F3 Defer \u2014 risk $10 fine tomorrow' }
-      ], G.lastEvent.eventImg);
+      ], ev.eventImg); });
     } else {
-      showModal(G.lastEvent);
+      enqueueModal('event', function() { showModal(ev); });
     }
   }
-  // Check for contextual advisor tips (e.g., wagon upgrade) when day advances.
-  // Skip if a modal is currently showing — Maeve would stack behind it.
-  if (!modalVisible && !G.lastEvent) {
-    if (!checkAdvisorTutorial()) checkAdvisorContextual();
-  }
+  // Contextual advisor tips on day advance now ENQUEUE (priority 3-4) rather
+  // than being skipped when an event modal is up. The queue releases them
+  // after the event closes — fixing the wagon->antagonist->resolution->Ramos
+  // 4-in-a-row stack (no longer dropped, no longer back-to-back). §4
+  if (!checkAdvisorTutorial()) checkAdvisorContextual();
 }
 
 function updateNetWorth() {
@@ -969,27 +980,32 @@ function sellProduct(productId, qty) {
     const lossAmount = Math.abs(profit).toFixed(2);
     const message = `Hey, I saw that last sale. You sold <strong>${product.name}</strong> for $${price.toFixed(2)} each, but you paid $${avgCost.toFixed(2)} \u2014 so you lost <strong>$${lossAmount}</strong> on that trade. That\u2019s what we call <strong>negative margin</strong>: when your sell price is lower than your buy price.<br><br>Don\u2019t sweat it \u2014 every business owner takes a loss sometimes. The trick is catching it before you commit. On the Sell tab, you can see your <strong>average cost</strong> for each product. If the sell price here is lower than that, sometimes it\u2019s smarter to hold the inventory and sell it somewhere else.`;
     advisorState.shownTips.firstLoss = true;
-    showAdvisor(message, 'Got it!', null, MAEVE_CONCERNED);
+    // Enqueued so it can't stack on top of the first-sell tutorial step if the
+    // very first sale is also a loss; the queue shows tutorial first, then this.
+    enqueueModal('tip', function() { showAdvisor(message, 'Got it!', null, MAEVE_CONCERNED); });
   } else if (isLoss) {
     // Subsequent losses: subtler banner (already visible in the sell history)
   }
   // Profit streak milestones (Career Mode only)
   if (G.isCareer && !isLoss && (G.profitStreak === 5 || G.profitStreak === 10 || G.profitStreak === 20)) {
-    showModal({
+    enqueueModal('tip', function() { showModal({
       type: 'streak', title: `${G.profitStreak}-Sale Streak!`,
       desc: `You\u2019ve made ${G.profitStreak} profitable sales in a row without a single loss. That\u2019s consistency \u2014 one of the most important traits in business.`,
       emoji: null,
       tip: G.profitStreak === 20 ? 'Twenty in a row. That\u2019s not luck \u2014 that\u2019s margin discipline.' : 'Keep it going! Consistent profits compound over time.'
-    });
+    }); });
   }
-  // Advisor check after sale (Ramos is deferred to Done Selling / Travel / Stay)
-  if (!modalVisible) {
-    if (!checkAdvisorTutorial()) checkAdvisorContextual();
-  }
+  // Advisor check after sale. These enqueue (priority 3-4), so they release in
+  // order behind any loss/streak modal above instead of being skipped/lost.
+  if (!checkAdvisorTutorial()) checkAdvisorContextual();
 }
 
 function confirmDoneSelling() {
   G.soldToday = true;
+  // v17g: if the first-session margin modal is still armed, the player has
+  // finished selling \u2014 fire it now (forced). This is the primary trigger; the
+  // inventory-exhausted case is handled at arm time in checkAdvisorTutorial.
+  fireMarginModalIfArmed(true);
   // If this is the last day, end the game automatically
   if (G.day >= G.days) {
     endGame();
@@ -1002,6 +1018,12 @@ function confirmDoneSelling() {
 
 function travel(destIndex) {
   if (destIndex === G.location) return;
+  // v17g: traveling is the genuine "done selling at this neighborhood" action.
+  // If the first-session margin modal is still armed (player left the Sell tab
+  // and traveled without clicking Done Selling), fire it now \u2014 before the bank
+  // visit and day advance \u2014 so the lesson appears in context. fireMarginModalIfArmed
+  // is a no-op if not armed or if mode is Career, so this is safe to call always.
+  fireMarginModalIfArmed(true);
   // Safety net: if Ramos hasn't visited yet on a bank day (e.g. player had nothing to sell), trigger him before travel
   if (shouldShowBankVisit() && !modalVisible) {
     showBankVisit();
@@ -1289,7 +1311,6 @@ function showBankVisit() {
 function makeSavingsChoice(amount) {
   var el = document.getElementById('bankModal');
   if (el) el.remove();
-  modalVisible = false;
 
   if (amount > 0) {
     G.cash = Math.round((G.cash - amount) * 100) / 100;
@@ -1308,10 +1329,14 @@ function makeSavingsChoice(amount) {
   if (G._pendingTravel !== undefined && G._pendingTravel !== null) {
     const dest = G._pendingTravel;
     G._pendingTravel = null;
+    modalVisible = false;
     travel(dest);
   } else if (G._pendingStay) {
     G._pendingStay = false;
+    modalVisible = false;
     stayDay();
+  } else {
+    onModalClosed(); // no pending action — release the next queued modal
   }
 }
 
@@ -1479,6 +1504,82 @@ function getGradeExplanation(scores) {
 // ===== ADVISOR: MAEVE =====
 let advisorState = { tutorialStep: 0, shownTips: {} };
 
+// ============================================================
+// TIER-BLIND MODAL QUEUE (v17f)
+// ------------------------------------------------------------
+// Problem this solves: blocking modals (antagonist event, its
+// resolution, Mr. Ramos bank visit, a tutorial step) could fire
+// on the same day and stack 3-4 deep with no gameplay between.
+// The old code "guarded" against this with scattered
+// `if (!modalVisible)` checks that SKIPPED (and silently lost)
+// a pop-up if another was showing.
+//
+// This queue replaces that lossy behavior: triggers ENQUEUE a
+// request instead of firing immediately or dropping it. Only one
+// blocking modal shows at a time; the next is released after the
+// player's next gameplay action (buy / sell / day advance), never
+// back-to-back.
+//
+// Tier-blind by design: the queue logic knows nothing about
+// Starter vs Full vs Career. Each tier's content simply enqueues.
+// Starter is its first consumer; Full Market, Career, and Tier 1-2
+// reuse it as-is (config, not reconstruction).
+//
+// Priority (lower number = shown first) per OnboardingSpec v2 §4:
+//   1 = antagonist event requiring a choice (blocks game state anyway)
+//   2 = bank visit / Mr. Ramos (time-bound to weekly cadence)
+//   3 = tutorial step
+//   4 = contextual tip (wagon, etc.)
+// ============================================================
+const MODAL_PRIORITY = { event: 1, bank: 2, tutorial: 3, tip: 4 };
+let modalQueue = [];
+let _pumpScheduled = false;
+
+// Enqueue a blocking modal request. `fn` actually shows the modal when released.
+// We DEFER the pump to a microtask so that several modals triggered within the
+// same synchronous tick (e.g. an event + the advisor check that follows it) all
+// land in the queue and get priority-sorted BEFORE the first one is shown.
+// Without this, a low-priority tip enqueued a moment before a high-priority
+// event would display first, because nothing was visible yet.
+function enqueueModal(kind, fn) {
+  modalQueue.push({ priority: MODAL_PRIORITY[kind] || 99, kind: kind, show: fn });
+  if (!_pumpScheduled) {
+    _pumpScheduled = true;
+    Promise.resolve().then(function() { _pumpScheduled = false; pumpModalQueue(); });
+  }
+  return true;
+}
+
+// Release the next queued modal IF nothing is currently showing. Sorts first so
+// the highest-priority pending item goes next.
+function pumpModalQueue() {
+  if (modalVisible) return;          // one at a time — wait for current to close
+  if (modalQueue.length === 0) return;
+  modalQueue.sort((a, b) => a.priority - b.priority);
+  const next = modalQueue.shift();
+  next.show();                        // this sets modalVisible = true itself
+}
+
+// Called from every modal's close handler so the queue keeps draining only
+// after the player dismisses the current one. Safe to call when queue is empty.
+function onModalClosed() {
+  modalVisible = false;
+  pumpModalQueue();
+}
+
+// ------------------------------------------------------------
+// DEMOTE-ROUTING (v17f) — tier-blind
+// A teaching beat can be routed to a non-blocking channel instead
+// of a modal. `markRecap(flag)` sets the advisorState flag that the
+// end-of-session recap (generateVocabRecap) reads, so demoting a
+// modal to a banner does NOT silently delete its recap entry.
+// Banners themselves are rendered inline in render(); this helper
+// just guarantees the recap flag survives the demotion.
+// ------------------------------------------------------------
+function markRecap(flag) {
+  if (flag) advisorState.shownTips[flag] = true;
+}
+
 function showAdvisor(message, buttonText, onClose, avatarImg) {
   modalVisible = true;
   const overlay = document.createElement('div');
@@ -1500,9 +1601,9 @@ function showAdvisor(message, buttonText, onClose, avatarImg) {
   document.body.appendChild(overlay);
   document.getElementById('advisorBtn').onclick = function() {
     overlay.remove();
-    modalVisible = false;
     if (onClose) onClose();
     else render();
+    onModalClosed(); // sets modalVisible=false and releases the next queued modal
   };
 }
 
@@ -1516,58 +1617,196 @@ function checkAdvisorTutorial() {
     G.metMaeve = true; // v17c: persist across Full Market -> Career carryover
     const bizName = playerInfo.businessName || 'your business';
     if (G.mode === 'starter') {
-      showAdvisor(
-        'Welcome to <strong>' + bizName + '</strong>! I\u2019m Maeve, and I\u2019ll be your business advisor.<br><br>You\u2019re starting with <strong>$50 in cash</strong> and a <strong>wagon that holds 50 items</strong>. Your goal is to buy products at low prices and sell them at higher prices to grow your business.<br><br>Oh, and every week my friend <strong>Mr. Ramos</strong> from the bank will stop by to help you manage your earnings. You\u2019ll meet him on Day 5.<br><br>Let\u2019s start with your first purchase. Click the <strong>Buy tab</strong> and buy some lemonade. Pay attention to the price \u2014 you\u2019ll want to sell it for more than you paid!',
+      enqueueModal('tutorial', function() { showAdvisor(
+        'Welcome to <strong>' + bizName + '</strong>! I\u2019m Maeve, and I\u2019ll be your business advisor.<br><br>You\u2019re starting with <strong>$50 in cash</strong> and a <strong>wagon that holds 50 items</strong>. Your goal is simple: buy products at low prices and sell them for more.<br><br>Let\u2019s start! Click the <strong>Buy tab</strong> and stock up your wagon. Pay attention to the prices \u2014 you\u2019ll want to sell for more than you paid.',
         'Let\u2019s get started!'
-      );
+      ); });
+    } else if (G.mode === 'full' && !G.isCareer) {
+      // v17g: Full Market now shows a preview screen (Option B) that already
+      // introduces Mr. Ramos via the banker card, so the welcome modal drops the
+      // Ramos sentence to avoid saying it twice in the first minute (mirrors the
+      // Starter decision). Career keeps its Ramos intro in the branch below.
+      enqueueModal('tutorial', function() { showAdvisor(
+        'Alright, here we go! Remember: you <strong>buy products here</strong>, then <strong>travel to a different neighborhood to sell them</strong>. You won\u2019t know the sell prices until you arrive \u2014 every purchase is a bet.<br><br>You have <strong>$50 in cash</strong>, a <strong>wagon with 50 slots</strong>, and all 6 products available from day one.<br><br>Start by clicking the <strong>Buy tab</strong> and loading up your wagon!',
+        'Let\u2019s get started!'
+      ); });
     } else {
-      showAdvisor(
+      // Career mode \u2014 unchanged. No preview screen, so it still introduces Ramos here.
+      enqueueModal('tutorial', function() { showAdvisor(
         'Alright, here we go! Remember: you <strong>buy products here</strong>, then <strong>travel to a different neighborhood to sell them</strong>. You won\u2019t know the sell prices until you arrive \u2014 every purchase is a bet.<br><br>You have <strong>$50 in cash</strong>, a <strong>wagon with 50 slots</strong>, and all 6 products available from day one. Every week, my friend <strong>Mr. Ramos</strong> from the bank will stop by to help you manage your earnings.<br><br>Start by clicking the <strong>Buy tab</strong> and loading up your wagon!',
         'Let\u2019s get started!'
-      );
+      ); });
     }
     return true;
   }
 
-  // Step 1: After first purchase
+  // Step 1: After first purchase.
+  // v17f (founder revision): in Starter, we do NOT fire the cost modal on the
+  // first single purchase. A first "shopping trip" may be several buys. Instead
+  // we ARM a trigger here and let fireCostModalIfArmed() show it once the trip
+  // is done — wagon full, can't afford the cheapest product, or the player
+  // leaves the Buy tab (whichever comes first). The modal then lists everything
+  // bought + the total. Full Market keeps the immediate single-buy modal (its
+  // teaching flow is travel-to-sell and is out of scope for this revision).
   if (step === 1 && G.buyHistory.length > 0 && G.sellHistory.length === 0) {
+    if (G.mode === 'starter' || (G.mode === 'full' && !G.isCareer)) {
+      // v17g: Full Market now uses the same patient treatment as Starter \u2014 arm
+      // the cost modal and let fireCostModalIfArmed() show it once the first
+      // shopping trip is done (wagon full, can't afford cheapest, or player
+      // leaves the Buy tab). Previously Full fired immediately after a single
+      // purchase, which interrupted mid-trip. Career keeps the immediate modal.
+      advisorState.awaitingCostModal = true;
+      fireCostModalIfArmed();
+      return true; // handled (armed); suppress contextual
+    }
+    // Career: immediate single-buy modal (unchanged).
     advisorState.tutorialStep = 2;
     const lastBuy = G.buyHistory[G.buyHistory.length - 1];
     const prodName = getProducts().find(p => p.id === lastBuy.product)?.name || 'that product';
-    if (G.mode === 'starter') {
-      showAdvisor(
-        `Nice! You bought ${prodName} at <strong>$${lastBuy.price.toFixed(2)} each</strong>. That\u2019s your <strong>cost</strong>.\n\nNow go to the <strong>Sell tab</strong> and sell it. Look at the sell price \u2014 if it\u2019s higher than what you paid, you\u2019ll make a <strong>profit</strong>. If it\u2019s lower, you\u2019ll take a <strong>loss</strong>. The difference is called your <strong>profit margin</strong>.`.replace(/\n/g, '<br>'),
-        'Show me the Sell tab'
-      );
-    } else {
-      showAdvisor(
-        `Nice! You bought ${prodName} at <strong>$${lastBuy.price.toFixed(2)} each</strong>. That\u2019s your <strong>cost</strong>.\n\nIn Full Market Mode, you can\u2019t sell where you bought. You need to <strong>travel to a different neighborhood</strong> first. Check the <strong>Map tab</strong> \u2014 each neighborhood has different prices. That\u2019s where the opportunity is!`.replace(/\n/g, '<br>'),
-        'Got it!'
-      );
-    }
+    enqueueModal('tutorial', function() { showAdvisor(
+      `Nice! You bought ${prodName} at <strong>$${lastBuy.price.toFixed(2)} each</strong>. That\u2019s your <strong>cost</strong>.\n\nIn Full Market Mode, you can\u2019t sell where you bought. You need to <strong>travel to a different neighborhood</strong> first. Check the <strong>Map tab</strong> \u2014 each neighborhood has different prices. That\u2019s where the opportunity is!`.replace(/\n/g, '<br>'),
+      'Got it!'
+    ); });
     return true;
   }
 
   // Step 2: After first sale
   if (step === 2 && G.sellHistory.length > 0 && G.sellHistory.length <= 2) {
+    if (G.mode === 'starter' || (G.mode === 'full' && !G.isCareer)) {
+      // v17g: the margin lesson now WAITS until the first selling session is
+      // done (Done Selling clicked, or inventory exhausted) instead of firing
+      // after the first single sale, which interrupted mid-session. We arm here
+      // and let fireMarginModalIfArmed() show it once. We do NOT advance the
+      // tutorial step yet \u2014 that function does it when it fires.
+      advisorState.awaitingMarginModal = true;
+      // Maybe the first sale already cleared the wagon; check immediately.
+      fireMarginModalIfArmed();
+      return true; // handled (armed); suppress contextual
+    }
+    // Career: immediate margin-% modal (unchanged).
     advisorState.tutorialStep = 3;
     const lastSell = G.sellHistory[G.sellHistory.length - 1];
     const avgCost = lastSell.avgCost || 0;
     const margin = avgCost > 0 ? Math.round(((lastSell.price - avgCost) / avgCost) * 100) : 0;
     const profitable = lastSell.price > avgCost;
-    const nextStepStarter = 'When you\u2019re done selling, click <strong>Done Selling</strong>. Then head to the <strong>Map tab</strong> to move to a new neighborhood. Once you arrive, you\u2019ll be able to buy and sell again. Each neighborhood has different prices \u2014 that\u2019s where the opportunity is!';
-    const nextStepFull = 'When you\u2019re done selling, click <strong>Done Selling</strong>. Then you can buy new stock on the <strong>Buy tab</strong> before traveling to the next neighborhood.';
-    const nextStep = G.mode === 'starter' ? nextStepStarter : nextStepFull;
-    showAdvisor(
+    const nextStep = 'When you\u2019re done selling, click <strong>Done Selling</strong>. Then you can buy new stock on the <strong>Buy tab</strong> before traveling to the next neighborhood.';
+    enqueueModal('tutorial', function() { showAdvisor(
       profitable
         ? ('You sold at <strong>$' + lastSell.price.toFixed(2) + '</strong> \u2014 that\u2019s a <strong>' + margin + '% profit margin</strong>! You\u2019re already thinking like a business owner.<br><br>' + nextStep + '<br><br>I\u2019ll check in from time to time, but you\u2019ve got the basics. Go make some money!')
         : ('You sold at <strong>$' + lastSell.price.toFixed(2) + '</strong>, but you paid <strong>$' + avgCost.toFixed(2) + '</strong> \u2014 that\u2019s a <strong>negative margin</strong>. You lost money on that trade.<br><br>Don\u2019t worry \u2014 it happens. The key is to check prices before you sell. ' + nextStep),
       'I\u2019ve got this!'
-    );
+    ); });
     return true;
   }
 
   return false;
+}
+
+// v17f (founder revision): the deferred Starter "cost" modal.
+// Armed by tutorial step 1 after the first purchase. Fires ONCE when the first
+// shopping trip is done — defined as: wagon full, can't afford the cheapest
+// unlocked product, OR the player leaves the Buy tab (handled in switchTab()).
+// `force` = true is passed by switchTab to fire regardless of wagon/cash state.
+function fireCostModalIfArmed(force) {
+  if (!G || !(G.mode === 'starter' || (G.mode === 'full' && !G.isCareer))) return false;
+  if (!advisorState.awaitingCostModal) return false;
+
+  // Determine whether the trip is "done" on its own (full or broke).
+  const free = wagonFree();
+  let cheapest = Infinity;
+  const loc = getNeighborhoods()[G.location].id;
+  getUnlocked().forEach(function(prod) {
+    const pr = G.prices[loc] && G.prices[loc][prod.id];
+    if (pr && pr.buy < cheapest) cheapest = pr.buy;
+  });
+  const cantAffordMore = (cheapest !== Infinity) && (G.cash < cheapest); // can't buy even the cheapest
+  const wagonIsFull = free <= 0;
+
+  if (!force && !cantAffordMore && !wagonIsFull) {
+    // Trip not obviously over and player hasn't left the Buy tab — wait.
+    return false;
+  }
+
+  // Fire once.
+  advisorState.awaitingCostModal = false;
+  advisorState.tutorialStep = 2;
+
+  // Build the itemized list + total from this first trip's purchases.
+  // Aggregate buyHistory by product (a product may have been bought in chunks).
+  const agg = {};
+  G.buyHistory.forEach(function(b) {
+    if (!agg[b.product]) agg[b.product] = { qty: 0, spend: 0 };
+    agg[b.product].qty += b.qty;
+    agg[b.product].spend += b.qty * b.price;
+  });
+  let totalSpend = 0, totalUnits = 0;
+  const lines = Object.keys(agg).map(function(pid) {
+    const name = getProducts().find(function(p){return p.id===pid;});
+    const a = agg[pid];
+    totalSpend += a.spend; totalUnits += a.qty;
+    const eachPrice = a.spend / a.qty;
+    return '\u2022 ' + a.qty + ' ' + (name ? name.name : pid) + ' at $' + eachPrice.toFixed(2) + ' each';
+  });
+  const listHtml = lines.join('<br>');
+  const reason = wagonIsFull
+    ? 'Your wagon is full \u2014 nice stocking up!'
+    : (cantAffordMore ? 'You\u2019ve spent most of your cash stocking up \u2014 nice work!' : 'Nice work stocking up!');
+
+  // v17g: the closing instruction differs by mode. Starter can sell where it
+  // bought ("head to the Sell tab"); Full Market CANNOT \u2014 it must travel first.
+  // Porting Starter's text verbatim would teach the wrong move in Full.
+  const closing = (G.mode === 'full')
+    ? '<br><br>Now head to the <strong>Map tab</strong>, travel to a different neighborhood, and sell them for <em>more</em> than you paid \u2014 that\u2019s how you make money!'
+    : '<br><br>Now head to the <strong>Sell tab</strong> and sell them for <em>more</em> than you paid \u2014 that\u2019s how you make money!';
+
+  const msg = reason + '<br><br>Here\u2019s what you bought:<br>' + listHtml +
+    '<br><br>Altogether that\u2019s <strong>$' + totalSpend.toFixed(2) + '</strong> for <strong>' + totalUnits + ' items</strong>. That money you spent is called your <strong>cost</strong>.' + closing;
+
+  enqueueModal('tutorial', function() { showAdvisor(msg, 'Let\u2019s sell!'); });
+  return true;
+}
+
+// v17g: the deferred margin modal (sell-side counterpart to the cost modal).
+// Armed by tutorial step 2 after the first sale. Fires ONCE when the first
+// selling session is done \u2014 the player clicks "Done Selling", or inventory hits
+// zero \u2014 whichever comes first. Previously the margin lesson fired after the
+// first single sale, interrupting the player mid-session. Applies to Starter and
+// Full Market (non-Career); Career keeps its immediate margin-% modal.
+function fireMarginModalIfArmed(force) {
+  if (!G || !(G.mode === 'starter' || (G.mode === 'full' && !G.isCareer))) return false;
+  if (!advisorState.awaitingMarginModal) return false;
+
+  // Wait unless the session is over: inventory exhausted, or forced (Done Selling).
+  const inventoryEmpty = totalInventory() === 0;
+  if (!force && !inventoryEmpty) {
+    return false;
+  }
+
+  // Fire once.
+  advisorState.awaitingMarginModal = false;
+  advisorState.tutorialStep = 3;
+
+  // Base the lesson on the first sale of this session (the teaching moment is
+  // "what is margin", not a running total \u2014 the first sale is the clearest hook).
+  const firstSell = G.sellHistory[0];
+  const avgCost = firstSell.avgCost || 0;
+  const profitable = firstSell.price > avgCost;
+
+  // nextStep differs by mode (Starter sells in place after travel; Full restocks).
+  const nextStepStarter = 'When you\u2019re ready, head to the <strong>Map tab</strong> to move to a new neighborhood. Once you arrive, you\u2019ll be able to buy and sell again. Each neighborhood has different prices \u2014 that\u2019s where the opportunity is!';
+  const nextStepFull = 'When you\u2019re ready, you can buy new stock on the <strong>Buy tab</strong> before traveling to the next neighborhood.';
+  const nextStep = (G.mode === 'starter') ? nextStepStarter : nextStepFull;
+
+  // Plain-language coin example (the assessment-backed teaching). Same in both.
+  // v17g: opening reworded for the post-session timing \u2014 the modal now fires after
+  // a full selling session (possibly several products), so it no longer says "you
+  // sold it" (singular). It speaks to the session, then teaches margin generally.
+  const coinMsg = profitable
+    ? ('You just made your first sale \u2014 nice work! When you sell something for <strong>more</strong> than you paid for it, that gap between what you <strong>pay</strong> and what you <strong>sell</strong> for is called your <strong>margin</strong>.<br><br>Think of it like this: if you buy a piece of candy for a <strong>nickel</strong> and sell it for a <strong>dime</strong>, your margin is one nickel. The bigger the gap, the more you keep.<br><br>' + nextStep)
+    : ('You just made your first sale \u2014 and it sold for <strong>less</strong> than you paid, which is a <strong>loss</strong>. That gap between what you pay and what you sell for is called your <strong>margin</strong>, and this time it went the wrong way.<br><br>Think of it like this: if you buy candy for a <strong>dime</strong> but can only sell it for a <strong>nickel</strong>, you lose a nickel. No worries \u2014 it happens to every business owner. The trick is checking the price before you sell.<br><br>' + nextStep);
+
+  enqueueModal('tutorial', function() { showAdvisor(coinMsg, 'I\u2019ve got this!'); });
+  return true;
 }
 
 function checkAdvisorContextual() {
@@ -1579,89 +1818,135 @@ function checkAdvisorContextual() {
   const wagonUpgradeKey = 'upgrade_' + G.wagonUpgradeIndex;
   if (!advisorState.shownTips[wagonUpgradeKey] && wagonUpgrade && G.netWorth >= wagonUpgrade.threshold && G.day >= wagonUpgrade.minDay) {
       advisorState.shownTips[wagonUpgradeKey] = true;
-      // First upgrade: full educational popup (introduces capital investment)
-      // Second+ upgrade: shorter celebratory popup (player already knows the concept)
+      // v17f DEMOTION (Starter): the blocking wagon modal is removed. The
+      // inline upgrade-card already lives in render() (the "Capital Investment
+      // Opportunity!" card), and the "Capital Investment" term is defined in
+      // generateVocabRecap with the player's real capacity. So no teaching is
+      // lost. We still set the recap flag implicitly via G.wagonCapacity>50.
+      // v17g: Full Market now also demotes to a banner (parity with Starter).
+      // Career (mode==='full' && isCareer) KEEPS the original educational modal.
+      if (G.mode === 'starter' || (G.mode === 'full' && !G.isCareer)) {
+        // Trigger a brief, non-blocking banner pointing at the inline card.
+        G.wagonTipBannerUntil = Date.now() + 9000;
+        render();
+        return false; // nothing blocking shown; allow other checks/queue to proceed
+      }
       let wagonMsg;
       if (G.wagonUpgradeIndex === 0) {
         wagonMsg = `Your business is growing! You\u2019ve unlocked a <strong>wagon upgrade</strong> \u2014 more space means you can carry more products and earn more per trip.\n\nBut here\u2019s the trade-off: the upgrade costs <strong>$${wagonUpgrade.cost}</strong>. That\u2019s cash you could spend on inventory instead. In business, this decision is called a <strong>capital investment</strong> \u2014 spending money now to earn more later.`;
       } else {
         wagonMsg = `Look at you go! You\u2019ve grown enough to unlock <strong>another wagon upgrade</strong> \u2014 ${wagonUpgrade.capacity} slots if you take it.\n\nYou know the drill: $${wagonUpgrade.cost} now in exchange for more capacity. Another <strong>capital investment</strong> decision \u2014 totally up to you whether the timing is right.`;
       }
-      showAdvisor(
+      enqueueModal('tip', function() { showAdvisor(
         wagonMsg.replace(/\n/g, '<br>'),
         'Got it!',
         null,
         MAEVE_TEACHING
-      );
+      ); });
       return true;
   }
 
   // All other contextual tips require tutorial completion
   if (advisorState.tutorialStep < 3) return false;
 
-  // First saturation — fires the saturation event modal (separate from Maeve advisor).
-  // Behavior 3: image-led teaching moment. The puzzled-Maeve-observing-empty-stand
-  // visual carries the conceptual weight; copy provides the specific takeaway.
+  // First saturation. v17f DEMOTION (Starter): the non-blocking saturation
+  // banner already exists in render() (it reads G.recentVisits directly), and
+  // the recap defines "Market Saturation" off the same flag. So for Starter we
+  // delete the blocking modal but KEEP the recap flag (markRecap) so the lesson
+  // survives. Full Market / Career keep the image-led teaching modal (queued).
   const satRecentCount = (G.recentVisits || []).filter(v => v.location === G.location && (G.day - v.day) < 5).length;
   if (satRecentCount >= 3 && !advisorState.shownTips.saturation) {
-    advisorState.shownTips.saturation = true;
-    showModal({
+    advisorState.shownTips.saturation = true; // also the recap flag — preserved
+    if (G.mode === 'starter') {
+      return false; // inline banner already renders; nothing blocking
+    }
+    enqueueModal('tip', function() { showModal({
       eventImg: SATURATION_IMG,
       title: 'Market Saturation',
       desc: `You\u2019ve been back to <strong>${getNeighborhoods()[G.location].name}</strong> a lot lately. Notice your sell prices dropping there? That\u2019s called <strong>market saturation</strong> \u2014 when you flood a market with too much of your product, supply outpaces demand and prices fall. Try giving this neighborhood a break and selling somewhere else for a while.`,
       tip: 'Time to move! Different neighborhoods are always looking for what you\u2019re selling.'
-    });
+    }); });
     return true;
   }
 
   // Wagon upgrade tip is now handled at the top of this function (before tutorial guard)
   // so that Starter Mode players see it even before completing the tutorial.
 
-  // Tip reminder on day 4 if never bought a tip
+  // Tip reminder on day 4 if never bought a tip. v17f DEMOTION (Starter):
+  // becomes a one-time banner pointing at the Market Research button (which is
+  // already on the Map tab). The "Market Research" term is defined in the recap
+  // if the player actually buys a tip. Full/Career keep the modal (queued).
   if (G.day === 4 && G.tipCount === 0 && !advisorState.shownTips.tipReminder) {
     advisorState.shownTips.tipReminder = true;
-    showAdvisor(
+    if (G.mode === 'starter' || (G.mode === 'full' && !G.isCareer)) {
+      G.researchTipBannerActive = true; // render() shows a one-time banner-info
+      render();
+      return false;
+    }
+    enqueueModal('tip', function() { showAdvisor(
       'Quick tip: see the <strong>Market Research</strong> button on the Map tab? For a small fee, I may be able to find out which neighborhoods have good prices right now.<br><br>It\u2019s not a guarantee \u2014 but paying for information before making a big decision is called <strong>market research</strong>, and it\u2019s one of the smartest investments you can make.',
       'Good to know!'
-    );
+    ); });
     return true;
   }
 
-  // Revenue vs Profit explanation after 3+ sales
+  // Revenue vs Profit explanation after 3+ sales. v17f DEMOTION (Starter):
+  // deleted entirely — both Revenue and Profit are defined in the recap with
+  // the player's real figures. No banner needed (too abstract mid-play, per §6).
+  // Full Market / Career keep the modal (queued).
   if (G.sellHistory.length >= 3 && !advisorState.shownTips.revenueProfit) {
     advisorState.shownTips.revenueProfit = true;
+    if (G.mode === 'starter') {
+      return false; // recap covers Revenue + Profit with real numbers
+    }
     const rev = G.totalRevenue.toFixed(2);
     const startNW = G.netWorthHistory[0] || 50;
     const profit = (G.netWorth - startNW).toFixed(2);
-    showAdvisor(
+    enqueueModal('tip', function() { showAdvisor(
       'Let me explain something important. Your <strong>revenue</strong> is $' + rev + ' \u2014 that\u2019s the total money that came in from sales. But revenue is NOT the same as profit.<br><br>Your <strong>profit</strong> is $' + profit + ' \u2014 that\u2019s what\u2019s left after subtracting what you paid for the products. A business can have high revenue and still make very little profit if their costs are too high.',
       'That makes sense!'
-    );
+    ); });
     return true;
   }
 
-  // Opportunity cost explanation when wagon is more than 70% full
+  // Opportunity cost when wagon >70%. v17f DEMOTION (Starter): becomes a short
+  // banner when the wagon crosses ~70% (a wagon-fill warning state already
+  // exists in render). The recap defines "Opportunity Cost" off this flag, so
+  // we KEEP the flag (markRecap). Full/Career keep the modal (queued).
   if (wagonPercent() > 70 && !advisorState.shownTips.opportunityCost && G.day >= 3) {
-    advisorState.shownTips.opportunityCost = true;
-    showAdvisor(
+    advisorState.shownTips.opportunityCost = true; // recap flag — preserved
+    if (G.mode === 'starter' || (G.mode === 'full' && !G.isCareer)) {
+      G.oppCostBannerUntil = Date.now() + 9000;
+      render();
+      return false;
+    }
+    enqueueModal('tip', function() { showAdvisor(
       'Your wagon is getting full! Every item you put in takes a slot that could go to something else. If you fill up on one product, you might miss out on another with a bigger profit margin.<br><br>This trade-off is called <strong>opportunity cost</strong> \u2014 what you give up when you choose one option over another. Smart business owners think about what they are saying no to every time they say yes.',
       'I\u2019ll choose wisely!'
-    );
+    ); });
     return true;
   }
 
   // First loss consolation now handled inline in sellProduct() using showAdvisor with MAEVE_CONCERNED
 
-  // Last day reminder — if player has unsold inventory on the final day
+  // Last day reminder — if player has unsold inventory on the final day.
+  // v17f DEMOTION (Starter): time-sensitive, so it stays LIVE but as a
+  // banner-warn instead of a modal. The recap defines "Inventory Turnover" off
+  // this flag, so we KEEP the flag. Full/Career keep the modal (queued).
   if (G.day === G.days && totalInventory() > 0 && !G.soldToday && !advisorState.shownTips.lastDay) {
-    advisorState.shownTips.lastDay = true;
+    advisorState.shownTips.lastDay = true; // recap flag — preserved
+    if (G.mode === 'starter' || (G.mode === 'full' && !G.isCareer)) {
+      G.lastDayBannerActive = true; // render() shows banner-warn
+      render();
+      return false;
+    }
     const invValue = Object.keys(G.inventory).reduce(function(sum, k) {
       return sum + (G.inventory[k] * (G.avgBuyPrice[k] || 0));
     }, 0);
-    showAdvisor(
+    enqueueModal('tip', function() { showAdvisor(
       'This is your last day! You still have <strong>' + totalInventory() + ' items</strong> in your wagon worth about <strong>$' + invValue.toFixed(2) + '</strong> in cost. Sell what you can before the day ends \u2014 unsold inventory is money sitting on the shelf.<br><br>In business, this is why <strong>inventory turnover</strong> matters. Product that doesn\u2019t sell is cash you can\u2019t use.',
       'Let me sell!'
-    );
+    ); });
     return true;
   }
 
@@ -1701,7 +1986,7 @@ function showTOS() {
       <p>These terms may be updated from time to time. Continued use of the application following any changes constitutes acceptance of the revised terms.</p>
 
       <h3>9. Contact</h3>
-      <p>For questions about these terms, please contact brent@brentfrazier.com.</p>
+      <p>For questions about these terms, please contact brent@notebookmogul.com.</p>
     </div>
     <button class="btn btn-primary" onclick="this.closest('.modal-overlay').remove();modalVisible=false;">Close</button>
   </div>`;
@@ -1744,9 +2029,22 @@ function showModal(event) {
     '<p>' + (event._dynamicDesc || event.desc) + '</p>' +
     (event.tip ? '<div class="tip-text">' + event.tip + '</div>' : '') +
     '<div class="modal-buttons" style="margin-top:12px">' +
-    '<button class="btn btn-primary btn-lg" onclick="this.closest(\'.modal-overlay\').remove();modalVisible=false;if(G.pendingUnlock){var pu=G.pendingUnlock;G.pendingUnlock=null;showModal(pu);}else{render();if(!checkAdvisorTutorial())checkAdvisorContextual();}">Got it!</button>' +
+    '<button class="btn btn-primary btn-lg" id="eventModalBtn">Got it!</button>' +
     '</div></div>';
   document.body.appendChild(overlay);
+  document.getElementById('eventModalBtn').onclick = function() {
+    overlay.remove();
+    // A pending product-unlock chains as its own queued modal rather than
+    // firing inline back-to-back (anti-stacking §4).
+    if (G.pendingUnlock) {
+      var pu = G.pendingUnlock; G.pendingUnlock = null;
+      enqueueModal('event', function() { showModal(pu); });
+    }
+    render();
+    // Re-check advisor beats; they enqueue rather than fire immediately.
+    if (!checkAdvisorTutorial()) checkAdvisorContextual();
+    onModalClosed(); // releases the next queued modal after this one closes
+  };
 }
 
 function showChoiceModal(title, emoji, desc, tip, choices, eventImg) {
@@ -1828,6 +2126,19 @@ function handleEventChoice(eventId, choiceIndex) {
 }
 
 // ===== RENDER ENGINE =====
+// switchTab routes all tab clicks. Its one extra job: if the deferred Starter
+// "cost" modal is armed and the player is LEAVING the Buy tab, that's the
+// "done shopping" signal — fire the modal now (forced), then switch. The modal
+// itself points them to the Sell tab, so after dismissing it they continue.
+function switchTab(tab) {
+  const leavingBuy = (G.activeTab === 'buy' && tab !== 'buy');
+  G.activeTab = tab;
+  render();
+  if (leavingBuy && advisorState.awaitingCostModal) {
+    fireCostModalIfArmed(true);
+  }
+}
+
 function render() {
   const app = document.getElementById('app');
   if (!G.day) { renderStart(app); return; }
@@ -1859,6 +2170,7 @@ function render() {
       <div class="stat"><span class="stat-label">Revenue</span><span class="stat-value">$${G.totalRevenue.toFixed(2)}</span></div>
       ${G.totalWeeks > 0 ? `<div class="stat"><span class="stat-label">Savings</span><span class="stat-value">$${G.savings.toFixed(2)}</span></div>` : ''}
     </div>
+    ${(G.mode === 'starter' || (G.mode === 'full' && !G.isCareer)) ? `<div class="goal-line">Buy low <span class="goal-arrow">\u2192</span> travel to a new neighborhood <span class="goal-arrow">\u2192</span> sell high</div>` : ''}
     <div class="location-card">
       <img src="${loc.img}" alt="${loc.name}">
       <div class="location-card-text">
@@ -1882,10 +2194,14 @@ function render() {
     ${G.soldToday && G.mode === 'starter' ? '<div class="banner banner-warn"> Done selling. Travel or Stay to advance.</div>' : ''}
     ${(() => { const c = (G.recentVisits || []).filter(v => v.location === G.location && (G.day - v.day) < 5).length; return c >= 3 ? `<div class="banner banner-warn">Market saturation in <strong>${getNeighborhoods()[G.location].name}</strong> \u2014 your sell prices here are down. Try selling somewhere else for a few days.</div>` : ''; })()}
     ${G.upgradeBannerUntil && Date.now() < G.upgradeBannerUntil ? `<div class="banner banner-info">Wagon upgraded! Your capacity is now <strong>${G.upgradeBannerCapacity} slots</strong>. Use that extra space wisely!</div>` : ''}
+    ${(G.mode === 'starter' || (G.mode === 'full' && !G.isCareer)) && G.wagonTipBannerUntil && Date.now() < G.wagonTipBannerUntil && upgrade ? `<div class="banner banner-info">New! You can <strong>invest in a bigger wagon</strong> below \u2014 more space means you can carry more to sell.</div>` : ''}
+    ${(G.mode === 'starter' || (G.mode === 'full' && !G.isCareer)) && G.researchTipBannerActive && G.tipCount === 0 ? `<div class="banner banner-info">Tip: the <strong>Market Research</strong> button on the Map tab can reveal good prices for a small fee.</div>` : ''}
+    ${(G.mode === 'starter' || (G.mode === 'full' && !G.isCareer)) && G.oppCostBannerUntil && Date.now() < G.oppCostBannerUntil ? `<div class="banner banner-warn">Your wagon is filling up \u2014 every slot you use is one you can\u2019t use for something with a bigger margin.</div>` : ''}
+    ${(G.mode === 'starter' || (G.mode === 'full' && !G.isCareer)) && G.lastDayBannerActive && G.day === G.days && !G.soldToday && totalInventory() > 0 ? `<div class="banner banner-warn">Last day! Sell what\u2019s left before the day ends \u2014 unsold items are money sitting on the shelf.</div>` : ''}
     ${upgrade && !(G.hasSoldThisTurn && !G.soldToday) ? `<div class="upgrade-card"><h3>Capital Investment Opportunity!</h3><p class="text-muted">${upgrade.label}: ${G.wagonCapacity} \u2192 ${upgrade.capacity} slots capacity</p><button class="btn btn-sell" onclick="purchaseWagonUpgrade()" ${G.cash < upgrade.cost ? 'disabled' : ''}>Invest $${upgrade.cost}</button></div>` : ''}
     ${G.mode === 'starter' ? renderProgressTrack(unlocked) : ''}
     <div class="tabs">
-      ${['buy','sell','travel','inventory','stats'].map(t => `<div class="tab ${G.activeTab===t?'active':''}" onclick="G.activeTab='${t}';render()">${t==='travel'?'Map':t==='inventory'?'Items':t.charAt(0).toUpperCase()+t.slice(1)}</div>`).join('')}
+      ${['buy','sell','travel','inventory','stats'].map(t => `<div class="tab ${G.activeTab===t?'active':''}" onclick="switchTab('${t}')">${t==='travel'?'Map':t==='inventory'?'Items':t.charAt(0).toUpperCase()+t.slice(1)}</div>`).join('')}
     </div>
     <div class="tab-content">${renderTab(unlocked)}</div>
   `;
@@ -2126,7 +2442,7 @@ function renderStart(app) {
       <div class="mode-detail"><span class="label">How to play:</span></div>
       <ul class="mode-list">
         <li>Buy and sell goods like lemonade, cookies, and toys across 4 neighborhoods</li>
-        <li>You start with lemonade and unlock new products every few days</li>
+        <li>Start with a couple of products and unlock new ones every few days</li>
         <li>You can buy and sell in the same location</li>
       </ul>
       <p class="text-muted" style="font-size:.72rem;margin-top:4px">Best for ages 8\u201312 or anyone new to business games.</p>
@@ -2165,32 +2481,88 @@ function submitNames() {
   render();
 }
 
+// ===== STARTER MECHANICS PREVIEW (v17f, §6) =====
+// Advance organizer: tells the kid three GOOD things to watch for so the
+// later in-context cues are recognized, not surprising. Hard rule: preview
+// MECHANICS in plain kid-language, NOT vocabulary. Saturation and
+// opportunity-cost are deliberately NOT previewed (preserve the discovery
+// moment). Starter-only; Full Market keeps its calibration intro.
+function showStarterPreview() {
+  var app = document.getElementById('app');
+  var bizName = playerInfo.businessName || 'your business';
+  app.innerHTML = '<div style="padding:14px">' +
+    '<h1>Welcome to ' + bizName + '!</h1>' +
+    '<p class="subtitle" style="margin-bottom:14px">Here are three things to look out for as you play:</p>' +
+    '<div class="preview-card">' +
+      '<div class="preview-emoji">\uD83D\uDED2</div>' +
+      '<div><div class="preview-title">A bigger wagon</div>' +
+      '<div class="preview-desc">As you earn more, you can buy a bigger wagon to carry more stuff.</div></div>' +
+    '</div>' +
+    '<div class="preview-card">' +
+      '<div class="preview-emoji">\uD83D\uDD0D</div>' +
+      '<div><div class="preview-title">Market Research</div>' +
+      '<div class="preview-desc">Not sure where to sell? Tap the <strong>Market Research</strong> button to pay a little for a hint about good prices.</div></div>' +
+    '</div>' +
+    '<div class="preview-card">' +
+      '<div class="preview-emoji">\uD83C\uDFE6</div>' +
+      '<div><div class="preview-title">The banker</div>' +
+      '<div class="preview-desc">Every week, Mr. Ramos from the bank stops by to help you with your money.</div></div>' +
+    '</div>' +
+    '<button class="btn btn-primary btn-lg" style="width:100%;margin-top:14px" onclick="beginStarterGame()">Let\u2019s go! \u2192</button>' +
+  '</div>';
+}
+
+function beginStarterGame() {
+  newGame('starter');
+  setTimeout(function() { checkAdvisorTutorial(); }, 100);
+}
+
 // ===== SKILL CALIBRATION =====
 function startCalibration(mode) {
   if (mode === 'starter') {
     advisorState = { tutorialStep: 0, shownTips: {} };
-    newGame('starter');
-    setTimeout(function() { checkAdvisorTutorial(); }, 100);
+    showStarterPreview();
     return;
   }
-  // Full Market: show Maeve intro first, then calibration
+  // Full Market (v17g, Option B): the plain "I'm Maeve, ready?" intro is replaced
+  // by a preview-style screen with three "look out for" cards (parity with Starter),
+  // which then flows into the existing skill-calibration scenario. Career is NOT
+  // routed here in a way that changes its intro \u2014 Career has its own flow.
   advisorState = { tutorialStep: 0, shownTips: {} };
-  var bizName = playerInfo.businessName || 'your business';
+  showFullPreview();
+}
+
+// v17g: Option B preview screen for Full Market. Mirrors showStarterPreview's
+// three teaching cards (bigger wagon, Market Research, the banker \u2014 all shared
+// mechanics) but keeps Maeve's portrait framing and routes to calibration, not
+// straight into the game. This gives Full the preview's teaching value without
+// adding a third orientation screen.
+function showFullPreview() {
   var app = document.getElementById('app');
-  app.innerHTML = '<div style="padding:16px">' +
-    '<div class="advisor-modal" style="max-width:100%;box-shadow:none;margin:0 auto">' +
-    '<div class="advisor-portrait-container">' +
-    '<img src="' + MAEVE_INTRO + '" class="advisor-portrait" alt="Maeve">' +
+  var bizName = playerInfo.businessName || 'your business';
+  app.innerHTML = '<div style="padding:14px">' +
+    '<div class="advisor-portrait-container" style="margin-bottom:6px">' +
+      '<img src="' + MAEVE_INTRO + '" class="advisor-portrait" alt="Maeve">' +
     '</div>' +
-    '<div class="advisor-name-block">' +
-    '<div class="advisor-name">Maeve</div>' +
-    '<div class="advisor-title">Your Business Advisor</div>' +
+    '<h1 style="text-align:center;margin:4px 0">Welcome to ' + bizName + '!</h1>' +
+    '<p class="subtitle" style="margin-bottom:14px;text-align:center">I\u2019m Maeve, your business advisor. Here are three things to look out for as you play:</p>' +
+    '<div class="preview-card">' +
+      '<div class="preview-emoji">\uD83D\uDED2</div>' +
+      '<div><div class="preview-title">A bigger wagon</div>' +
+      '<div class="preview-desc">As you earn more, you can buy a bigger wagon to carry more stuff per trip.</div></div>' +
     '</div>' +
-    '<div class="advisor-body">Welcome to <strong>' + bizName + '</strong>! I\u2019m Maeve, and I\u2019ll be your business advisor.' +
-    '<br><br>Before we start, I want to understand how you think about business. I\u2019m going to show you a quick scenario \u2014 two types of products and a limited budget. There\u2019s no wrong answer. Just pick the approach that feels right to you.' +
-    '<br><br>Your choice helps me adjust the game to your experience level. Ready?</div>' +
-    '<div class="modal-buttons"><button class="btn btn-primary btn-lg" onclick="showCalibrationScreen()">Show me the scenario! \u2192</button></div>' +
-    '</div></div>';
+    '<div class="preview-card">' +
+      '<div class="preview-emoji">\uD83D\uDD0D</div>' +
+      '<div><div class="preview-title">Market Research</div>' +
+      '<div class="preview-desc">Not sure where to sell? Tap the <strong>Market Research</strong> button to pay a little for a hint about good prices.</div></div>' +
+    '</div>' +
+    '<div class="preview-card">' +
+      '<div class="preview-emoji">\uD83C\uDFE6</div>' +
+      '<div><div class="preview-title">The banker</div>' +
+      '<div class="preview-desc">Every week, Mr. Ramos from the bank stops by to help you with your money.</div></div>' +
+    '</div>' +
+    '<button class="btn btn-primary btn-lg" style="width:100%;margin-top:14px" onclick="showCalibrationScreen()">Next \u2192</button>' +
+  '</div>';
 }
 
 function showCalibrationScreen() {
