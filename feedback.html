@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Notebook Mogul — Tell me what you think</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Patrick+Hand&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#c8bda0; --paper:#faf5eb; --paper2:#fff7e6;
+    --ink:#4a3a2a; --ink-soft:#7a6a58; --line:#e0d6c2;
+    --green:#4a6a3a; --green-dark:#3d5c30; --accent:#b85c2a;
+  }
+  *{box-sizing:border-box}
+  body{
+    font-family:'Nunito',sans-serif; color:var(--ink); line-height:1.5;
+    background:var(--bg);
+    background-image:url("data:image/svg+xml,%3Csvg width='100' height='100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='.7' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100' height='100' filter='url(%23n)' opacity='.06'/%3E%3C/svg%3E");
+    margin:0; padding:18px 10px; min-height:100vh;
+    display:flex; justify-content:center; align-items:flex-start;
+  }
+  .card{
+    background:var(--paper); width:100%; max-width:560px;
+    border:1px solid var(--line); border-radius:18px;
+    box-shadow:0 8px 28px rgba(74,58,42,.18);
+    padding:26px 22px 30px;
+  }
+  h1{
+    font-family:'Patrick Hand',cursive; font-weight:400;
+    font-size:2.1rem; line-height:1.1; margin:0 0 6px; color:var(--ink);
+  }
+  .lede{margin:0 0 16px; color:var(--ink-soft); font-size:1rem}
+  .note{
+    background:var(--paper2); border:1px solid var(--line);
+    border-left:4px solid var(--accent); border-radius:10px;
+    padding:10px 12px; margin:0 0 22px; font-size:.86rem; color:var(--ink-soft);
+  }
+  .q{margin:0 0 20px}
+  .q > label.qlabel{display:block; font-weight:700; margin:0 0 9px; font-size:1rem}
+  .opt-flag{font-weight:600; color:var(--ink-soft); font-size:.82rem}
+  .chips{display:flex; flex-wrap:wrap; gap:8px}
+  .chip{position:relative; cursor:pointer}
+  .chip input{position:absolute; opacity:0; width:0; height:0}
+  .chip span{
+    display:inline-block; padding:9px 15px; border:2px solid var(--line);
+    border-radius:999px; background:var(--paper2); font-weight:600; font-size:.92rem;
+    transition:background .12s, border-color .12s, color .12s;
+  }
+  .chip:has(input:checked) span{background:var(--green); border-color:var(--green); color:#fff}
+  .chip input:focus-visible + span{outline:3px solid #2b4c7e; outline-offset:2px}
+  textarea, input[type=email]{
+    width:100%; font-family:'Nunito',sans-serif; font-size:.95rem; color:var(--ink);
+    background:var(--paper2); border:2px solid var(--line); border-radius:10px;
+    padding:10px 12px; resize:vertical;
+  }
+  textarea{min-height:64px}
+  textarea:focus, input[type=email]:focus{outline:none; border-color:var(--green)}
+  .submit{
+    font-family:'Nunito',sans-serif; font-weight:800; font-size:1.05rem;
+    background:var(--green); color:#fff; border:none; border-radius:12px;
+    padding:13px 22px; cursor:pointer; width:100%;
+    box-shadow:0 2px 4px rgba(74,106,58,.25); transition:background .12s;
+  }
+  .submit:hover{background:var(--green-dark)}
+  .submit:disabled{opacity:.6; cursor:default}
+  .err{color:#b83a2a; font-size:.85rem; margin-top:10px; display:none}
+  .thanks{display:none; text-align:center; padding:14px 6px}
+  .thanks h1{margin-bottom:10px}
+  .thanks p{color:var(--ink-soft); font-size:1.02rem; max-width:420px; margin:0 auto}
+  @media (prefers-reduced-motion: reduce){*{transition:none !important}}
+</style>
+</head>
+<body>
+  <div class="card">
+    <form id="fb" novalidate>
+      <h1>How did it go?</h1>
+      <p class="lede">Thanks for trying Notebook Mogul! A few quick questions about your child&rsquo;s experience &mdash; most are just one tap.</p>
+      <div class="note">This form is anonymous. Please don&rsquo;t include your child&rsquo;s name anywhere. The email field is optional and used only if I have a follow-up question &mdash; no other personal information is collected.</div>
+
+      <div class="q">
+        <label class="qlabel">Which version did your child play?</label>
+        <div class="chips">
+          <label class="chip"><input type="radio" name="Version played" value="Starter"><span>Starter</span></label>
+          <label class="chip"><input type="radio" name="Version played" value="Full Market"><span>Full Market</span></label>
+          <label class="chip"><input type="radio" name="Version played" value="Both"><span>Both</span></label>
+          <label class="chip"><input type="radio" name="Version played" value="Not sure"><span>Not sure</span></label>
+        </div>
+      </div>
+
+      <div class="q">
+        <label class="qlabel">About how old is your child?</label>
+        <div class="chips">
+          <label class="chip"><input type="radio" name="Child age range" value="8-10"><span>8&ndash;10</span></label>
+          <label class="chip"><input type="radio" name="Child age range" value="11-13"><span>11&ndash;13</span></label>
+          <label class="chip"><input type="radio" name="Child age range" value="14-16"><span>14&ndash;16</span></label>
+          <label class="chip"><input type="radio" name="Child age range" value="Other"><span>Other</span></label>
+        </div>
+      </div>
+
+      <div class="q">
+        <label class="qlabel">Did your child enjoy it?</label>
+        <div class="chips">
+          <label class="chip"><input type="radio" name="Enjoyment" value="Loved it"><span>Loved it</span></label>
+          <label class="chip"><input type="radio" name="Enjoyment" value="Liked it"><span>Liked it</span></label>
+          <label class="chip"><input type="radio" name="Enjoyment" value="It was okay"><span>It was okay</span></label>
+          <label class="chip"><input type="radio" name="Enjoyment" value="Not really"><span>Not really</span></label>
+        </div>
+      </div>
+
+      <div class="q">
+        <label class="qlabel">Did it make sense &mdash; did they understand what to do?</label>
+        <div class="chips">
+          <label class="chip"><input type="radio" name="Made sense" value="Clear"><span>Clear</span></label>
+          <label class="chip"><input type="radio" name="Made sense" value="Mostly"><span>Mostly</span></label>
+          <label class="chip"><input type="radio" name="Made sense" value="Confusing in places"><span>Confusing in places</span></label>
+          <label class="chip"><input type="radio" name="Made sense" value="Lost"><span>Lost</span></label>
+        </div>
+      </div>
+
+      <div class="q">
+        <label class="qlabel" for="stuck">Anything that confused them or where they got stuck? <span class="opt-flag">(optional)</span></label>
+        <textarea id="stuck" name="Confusing or stuck"></textarea>
+      </div>
+
+      <div class="q">
+        <label class="qlabel">Did they want to play again?</label>
+        <div class="chips">
+          <label class="chip"><input type="radio" name="Wanted to play again" value="Replayed it"><span>Replayed it</span></label>
+          <label class="chip"><input type="radio" name="Wanted to play again" value="Wanted to"><span>Wanted to</span></label>
+          <label class="chip"><input type="radio" name="Wanted to play again" value="No"><span>No</span></label>
+        </div>
+      </div>
+
+      <div class="q">
+        <label class="qlabel" for="tech">Any technical problems &mdash; didn&rsquo;t load, glitches? <span class="opt-flag">(optional)</span></label>
+        <textarea id="tech" name="Technical problems"></textarea>
+      </div>
+
+      <div class="q">
+        <label class="qlabel" for="else">Anything else you&rsquo;d want me to know? <span class="opt-flag">(optional)</span></label>
+        <textarea id="else" name="Anything else"></textarea>
+      </div>
+
+      <div class="q">
+        <label class="qlabel" for="email">Your email <span class="opt-flag">(optional &mdash; only if you&rsquo;re open to a follow-up)</span></label>
+        <input type="email" id="email" name="Parent email" autocomplete="email" placeholder="you@example.com">
+      </div>
+
+      <input type="hidden" name="_subject" value="New Notebook Mogul feedback">
+      <button type="button" class="submit" id="send">Send feedback</button>
+      <div class="err" id="err">Something went wrong sending that. Please try again in a moment.</div>
+    </form>
+
+    <div class="thanks" id="thanks">
+      <h1>Thank you!</h1>
+      <p>This is exactly the kind of thing that helps make the game better. You can close this tab now &mdash; and thanks again for taking the time.</p>
+    </div>
+  </div>
+
+<script>
+  // ===== Formspree wiring =====
+  // After creating your form at formspree.io, paste its endpoint below
+  // (looks like https://formspree.io/f/abcdwxyz). Until then, the page runs
+  // in PREVIEW mode: it shows the thank-you screen and logs the data to the
+  // browser console instead of actually sending.
+  var FORMSPREE_ENDPOINT = "https://formspree.io/f/mjgdrnjk";
+
+  var form = document.getElementById('fb');
+  var thanks = document.getElementById('thanks');
+  var sendBtn = document.getElementById('send');
+  var errBox = document.getElementById('err');
+
+  function showThanks(){
+    form.style.display = 'none';
+    thanks.style.display = 'block';
+    window.scrollTo({top:0, behavior:'smooth'});
+  }
+
+  function handleSubmit(e){
+    if (e) e.preventDefault();
+    errBox.style.display = 'none';
+    var data = new FormData(form);
+
+    // Preview mode until a real endpoint is set
+    if (FORMSPREE_ENDPOINT.indexOf('REPLACE_WITH') !== -1){
+      var obj = {}; data.forEach(function(v,k){ obj[k] = v; });
+      console.log('[PREVIEW] Feedback that would be emailed:', obj);
+      showThanks();
+      return;
+    }
+
+    sendBtn.disabled = true;
+    sendBtn.textContent = 'Sending...';
+    fetch(FORMSPREE_ENDPOINT, {
+      method:'POST', body:data, headers:{'Accept':'application/json'}
+    }).then(function(r){
+      if (r.ok){ showThanks(); }
+      else { throw new Error('bad response'); }
+    }).catch(function(){
+      errBox.style.display = 'block';
+      sendBtn.disabled = false;
+      sendBtn.textContent = 'Send feedback';
+    });
+  }
+
+  // Drive off the button click directly (works even in restrictive sandboxed
+  // previews where form submission is blocked), and also on the form's submit
+  // event so the Enter key still works on the hosted page.
+  sendBtn.addEventListener('click', handleSubmit);
+  form.addEventListener('submit', handleSubmit);
+</script>
+</body>
+</html>
