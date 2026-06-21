@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Notebook Mogul</title>
+<title>Notebook Mogul — Full Market</title>
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Patrick+Hand&display=swap" rel="stylesheet">
 <style>
 /* ===== RESET & BASE ===== */
@@ -238,8 +238,7 @@ canvas{width:100%;height:120px}
 
 <script>
 // ===== BUILD FLAG =====
-// PUBLIC_BUILD = true: ships as Free version (Starter + Full Market only, Career Mode hidden + locked)
-// PUBLIC_BUILD = false: dev build with full Career Mode access
+// PUBLIC_BUILD = true (Free build — Full Market only)
 const PUBLIC_BUILD = true;
 
 // ===== GLOBAL ERROR BOUNDARY (Item #33, v17d) =====
@@ -445,6 +444,17 @@ const TIER_DATA = {
     antagonists: ANTAGONISTS,
     events: EVENTS,
     wagonUpgrades: WAGON_UPGRADES
+  },
+  // Tier 1-3 "The Team" (Phase A base, v19n-1-3): registers the tier so
+  // currentTier() can resolve to '1-3' and the level is playable. Employee
+  // mechanics (hiring screen, Home Stand, weekly allocation, Day-15 training)
+  // are layered on in later phases per Tier1-3_DesignSpec_v1.
+  '1-3': {
+    products: PRODUCTS,
+    neighborhoods: NEIGHBORHOODS,
+    antagonists: ANTAGONISTS,
+    events: EVENTS,
+    wagonUpgrades: WAGON_UPGRADES
   }
 };
 
@@ -465,9 +475,400 @@ function getWagonUpgrades()  { return TIER_DATA[currentTier()].wagonUpgrades; }
 // v18a: display name for a Career level code. One source of truth so every
 // label (greeting, in-game banner, end screen, report) stays consistent.
 function careerLevelName(level) {
-  const names = { '1-1': 'The Hustle', '1-2': 'Wheels', '1-3': 'Storefront' };
+  const names = { '1-1': 'The Hustle', '1-2': 'Wheels', '1-3': 'The Team' };
   return names[level] || '';
 }
+
+// ===== TIER 1-3 EMPLOYEE SYSTEM (Phase B, v19p) =====
+// Three fixed candidates. stars() renders filled/empty star strings.
+// G.employee is set on hire and carried forward. Phase C wires stand mechanics.
+
+const CANDIDATES = [
+  {
+    id: 'jake',
+    name: 'Jake',
+    nickname: '"The Hustler"',
+    emoji: '💪',
+    personality: 'Sells a lot when he shows up — but sometimes he doesn\'t come in.',
+    wage: 2.50,
+    salesStars: 6,
+    reliabilityStars: 2,
+    pronoun: 'his',
+    pronounSubject: 'he'
+  },
+  {
+    id: 'maya',
+    name: 'Maya',
+    nickname: '"The Detail Person"',
+    emoji: '📋',
+    personality: 'Doesn\'t sell as much, but she\'s always there.',
+    wage: 4.50,
+    salesStars: 4,
+    reliabilityStars: 6,
+    pronoun: 'her',
+    pronounSubject: 'she'
+  },
+  {
+    id: 'tyler',
+    name: 'Tyler',
+    nickname: '"The Happy-Go-Lucky"',
+    emoji: '😄',
+    personality: 'Pretty good at everything — nothing amazing.',
+    wage: 3.50,
+    salesStars: 5,
+    reliabilityStars: 4,
+    pronoun: 'his',
+    pronounSubject: 'he'
+  }
+];
+
+// Renders a star row: filled stars + empty stars up to maxStars.
+function renderStars(filled, maxStars) {
+  let s = '';
+  for (let i = 0; i < maxStars; i++) {
+    s += i < filled ? '⭐' : '<span style="opacity:.25">⭐</span>';
+  }
+  return s;
+}
+
+// Show-up probability per candidate (used in Phase C stand mechanics).
+// Stored on G.employee so Phase C can read it without re-referencing CANDIDATES.
+function candidateShowUpRate(id) {
+  const rates = { jake: 0.75, maya: 0.95, tyler: 0.85 };
+  return rates[id] || 0.85;
+}
+
+// Base daily units sold when present (used in Phase C). Tuning happens in Phase F.
+function candidateSalesRate(id) {
+  const rates = { jake: 8, maya: 5, tyler: 6 };
+  return rates[id] || 6;
+}
+
+// ===== HOME STAND (Tier 1-3 Phase C) =====
+// Capacity: 35 slots (Phase F tuning). Saturation is tracked separately from
+// the player's wagon via G.standVisits — a parallel array of { day } records
+// for the stand's fixed neighborhood. Slower saturation curve than the player
+// (stand accumulates presence every day it's open, not every player visit).
+// The stand's daily sell price uses the stand's location prices, not the player's.
+var STAND_CAPACITY = 35;
+// Trained show-up rates set at Day-15 training event (per DesignSpec).
+var STAND_TRAINED_SHOWUP = { jake: 0.87, maya: 0.97, tyler: 0.92 };
+// Stand saturation: own threshold/counter (slower curve, see design spec).
+// Fires a gradual squeeze by week 3-4, not a cliff. The stand "visits" one
+// entry per day it sells (like the player visiting a neighborhood daily).
+// We reuse saturationDays() logic but against G.standVisits — stand trips
+// saturation only after 4+ distinct days in any 5-day window (one threshold
+// for all since stand is always walking-speed equivalent).
+var STAND_SATURATION_THRESHOLD = 4;
+// Cannibalization nudge: shown once on the 2nd time player is in same neighborhood
+// as stand on the same day.
+// G._standOverlapCount is incremented in processStandDay; nudge fires at 2.
+
+// Called after the 1-3 Maeve greeting closes. Replaces app content with the
+// three-candidate hiring screen. Player must hire before Day 1 begins.
+function showHiringScreen() {
+  const app = document.getElementById('app');
+  const bizName = playerInfo.businessName || 'your business';
+  let cards = '';
+  CANDIDATES.forEach(function(c) {
+    cards += '<div style="background:#fff;border:2px solid #e0d6c2;border-radius:12px;padding:14px 12px;margin:8px 0;text-align:left">' +
+      '<div style="margin-bottom:10px">' +
+        '<div style="font-family:\'Patrick Hand\',cursive;font-size:1.05rem;color:#4a3a2a;font-weight:700">' + c.name + ' ' + c.nickname + '</div>' +
+        '<div style="font-size:.76rem;color:#6b5b4a;line-height:1.5;margin-top:4px">' + c.personality + '</div>' +
+      '</div>' +
+      '<div style="font-size:.78rem;color:#4a3a2a;margin-bottom:5px"><strong>Wage:</strong> <span style="color:#b83a2a;font-weight:700">$' + c.wage.toFixed(2) + '/day</span></div>' +
+      '<div style="font-size:.78rem;color:#4a3a2a;margin-bottom:4px"><strong>Sales:</strong> ' + renderStars(c.salesStars, 6) + '</div>' +
+      '<div style="font-size:.78rem;color:#4a3a2a;margin-bottom:10px"><strong>Reliability:</strong> ' + renderStars(c.reliabilityStars, 6) + '</div>' +
+      '<button class="btn btn-primary" style="width:100%;font-size:.82rem" onclick="hireEmployee(\'' + c.id + '\')">Hire ' + c.name + '</button>' +
+    '</div>';
+  });
+
+  app.innerHTML = '<div style="padding:14px">' +
+    '<h1 style="text-align:center;margin-bottom:2px">Hire Your Helper</h1>' +
+    '<p style="text-align:center;font-size:.82rem;color:#6b5b4a;margin-bottom:14px">They\'ll run a stand while you work the streets. Pick wisely — this person works for <strong>' + bizName + '</strong> all season.</p>' +
+    '<div class="card" style="border-left:3px solid #2B4C7E;border-radius:0 8px 8px 0;margin-bottom:14px;font-size:.78rem;color:#4a3a2a">' +
+      '<strong>Wages</strong> — the money you pay someone to work for you. Your helper earns their wage every day they show up, whether your stand has a great day or a slow one.' +
+    '</div>' +
+    cards +
+    '<p style="text-align:center;font-size:.7rem;color:#8a7a68;margin-top:8px">You can\'t switch helpers mid-season. Choose the one that fits how you want to run things.</p>' +
+  '</div>';
+}
+
+// Called when player taps "Hire [Name]". Stores employee on G and starts Day 1.
+function hireEmployee(candidateId) {
+  const c = CANDIDATES.find(function(x) { return x.id === candidateId; });
+  if (!c) return;
+  G.employee = {
+    id: c.id,
+    name: c.name,
+    wage: c.wage,
+    salesStars: c.salesStars,
+    reliabilityStars: c.reliabilityStars,
+    showUpRate: candidateShowUpRate(c.id),
+    dailySalesRate: candidateSalesRate(c.id),
+    trained: false,         // flips to true at Day 15 training event
+    trainedShowUpRate: 0,   // set at training (Phase C)
+    pronoun: c.pronoun,           // v19q: needed by chooseStandLocation and processStandDay
+    pronounSubject: c.pronounSubject  // v19q: needed for gendered Maeve messages
+  };
+  // Teach Wages in-line (one new word per moment principle)
+  // The vocab system will pick it up from taughtConcepts in Phase D.
+  render();
+  showAdvisor(
+    'You hired <strong>' + c.name + '</strong>! ' + c.pronoun.charAt(0).toUpperCase() + c.pronoun.slice(1) + ' wage is <strong>$' + c.wage.toFixed(2) + ' per day</strong> — that\'s your <strong>Labor Cost</strong>. It comes out of your cash every day ' + c.pronounSubject + ' works, no matter how much ' + c.pronounSubject + ' sells.<br><br>Now let\'s find a spot for ' + c.pronoun + ' stand.',
+    'Let\'s go!',
+    showStandLocationScreen,
+    MAEVE_TEACHING
+  );
+}
+
+// ===== STAND LOCATION SCREEN (Phase C) =====
+function showStandLocationScreen() {
+  // Hold the modal queue while the picker is on screen so nothing can pump
+  // through underneath it. chooseStandLocation() will hand off to enqueueModal.
+  modalVisible = true;
+  var app = document.getElementById('app');
+  var nbds = getNeighborhoods();
+  var emp = G.employee;
+  if (!emp) { modalVisible = false; return; }
+  var cards = '';
+  nbds.forEach(function(n, i) {
+    var imgHtml = n.img ? '<img src="' + n.img + '" style="width:68px;height:68px;border-radius:8px;object-fit:cover;float:right;margin-left:10px;flex-shrink:0" alt="' + n.name + '">' : '';
+    cards += '<div style="background:#fff;border:2px solid #e0d6c2;border-radius:12px;padding:14px 12px;margin:8px 0;overflow:hidden">' +
+      imgHtml +
+      '<div style="font-family:\'Patrick Hand\',cursive;font-size:1.0rem;color:#4a3a2a;font-weight:700;margin-bottom:4px">' + n.name + '</div>' +
+      '<div style="font-size:.78rem;color:#6b5b4a;line-height:1.4;margin-bottom:10px">' + n.desc + '</div>' +
+      '<button class="btn btn-primary" style="width:100%;margin-top:4px;font-size:.82rem" onclick="chooseStandLocation(' + i + ')">Set up stand here</button>' +
+      '</div>';
+  });
+  app.innerHTML = '<div style="padding:16px 12px;max-width:480px;margin:0 auto">' +
+    '<div class="card" style="border-left:4px solid #7a9a6a;border-radius:0 8px 8px 0;margin-bottom:14px">' +
+    '<div style="font-size:.8rem;color:#5a7a4a;font-weight:700;margin-bottom:4px">Delegation</div>' +
+    '<div style="font-size:.82rem;color:#4a3a2a;line-height:1.5"><strong>Delegation</strong> means letting someone else handle part of your business. ' + emp.name + ' will run the stand while you keep working the streets.</div>' +
+    '</div>' +
+    '<div style="font-family:\'Patrick Hand\',cursive;font-size:1.1rem;color:#4a3a2a;margin-bottom:10px;font-weight:700">Where should ' + emp.name + '\u2019s stand go?</div>' +
+    cards +
+    '</div>';
+}
+
+function chooseStandLocation(neighborhoodIndex) {
+  var nbds = getNeighborhoods();
+  G.standLocation = neighborhoodIndex;
+  G.standInventory = {};
+  getProducts().forEach(function(p) { G.standInventory[p.id] = 0; });
+  var emp = G.employee;
+  var locName = nbds[neighborhoodIndex].name;
+  render();
+  // Enqueue the Maeve instruction at alloc priority (0), then release the
+  // picker's modalVisible lock via onModalClosed so the queue can pump the alloc.
+  enqueueModal('alloc', function() {
+    showAdvisor(
+      emp.name + '\u2019s stand is set up in <strong>' + locName + '</strong>! Here\u2019s how to stock it: first, head to the <strong>Buy tab</strong> and fill your wagon with inventory. Then tap the <strong>Stats tab</strong> and scroll down to <strong>Manage ' + emp.name + '\u2019s Stand</strong> \u2014 that\u2019s where you move stock from your wagon to the stand. Once you\u2019ve transferred what you want, tap <strong>Done</strong> and ' + emp.name + ' will start selling!',
+      'Go Buy Stock!',
+      function() { switchTab('buy'); render(); },
+      MAEVE_TEACHING
+    );
+  });
+  // Release the picker's lock — pump will fire the alloc we just enqueued.
+  onModalClosed();
+}
+
+// ===== PROCESS STAND DAY (Phase C) =====
+function processStandDay() {
+  if (!G.employee || G.standLocation === null || G.standLocation === undefined) return;
+  var emp = G.employee;
+  var nbds = getNeighborhoods();
+  var standLoc = nbds[G.standLocation];
+  var standLocId = standLoc.id;
+
+  // Day-15 Training Event
+  if (G.day === 15 && !emp.trained) {
+    emp.trained = true;
+    emp.trainedShowUpRate = STAND_TRAINED_SHOWUP[emp.id] || emp.showUpRate;
+    var oldRate = Math.round(emp.showUpRate * 100);
+    var newRate = Math.round(emp.trainedShowUpRate * 100);
+    enqueueModal('tip', function() {
+      showAdvisor(
+        'You\u2019ve kept <strong>' + emp.name + '</strong> on for two weeks \u2014 that\u2019s an investment.<br><br>' +
+        emp.name + '\u2019s getting more reliable: ' + emp.pronounSubject.charAt(0).toUpperCase() + emp.pronounSubject.slice(1) + ' will show up <strong>' + newRate + '% of days</strong> now, up from ' + oldRate + '%.<br><br>' +
+        'That improvement has a name: <strong>Training ROI</strong>. You kept ' + emp.pronoun + ' on \u2014 ' + emp.pronounSubject + ' got better. That\u2019s the return on your investment.',
+        'Got it!',
+        null,
+        MAEVE_TEACHING
+      );
+    });
+  }
+
+  // Show-up roll
+  var showUpRate = emp.trained ? emp.trainedShowUpRate : emp.showUpRate;
+  var showedUp = Math.random() < showUpRate;
+  if (!showedUp) {
+    G._standLastResult = emp.name + ' didn\u2019t show up today.';
+    return;
+  }
+
+  // Wage deduction
+  G.cash = Math.round((G.cash - emp.wage) * 100) / 100;
+  if (G.cash < 0) G.cash = 0;
+  G.employeeTotalWagesPaid = Math.round(((G.employeeTotalWagesPaid || 0) + emp.wage) * 100) / 100;
+  G.employeeDaysWorked = (G.employeeDaysWorked || 0) + 1; // v19v (Phase D): count actual days employee showed up
+
+  // Stand saturation tracking (separate from player saturation)
+  if (!G.standVisits) G.standVisits = [];
+  G.standVisits.push({ day: G.day });
+  G.standVisits = G.standVisits.filter(function(v) { return (G.day - v.day) < 7; });
+  var recentSet = new Set(G.standVisits.filter(function(v) { return (G.day - v.day) < 5; }).map(function(v) { return v.day; }));
+  var standSatCount = recentSet.size;
+  var satPenalty = 0;
+  if (standSatCount >= STAND_SATURATION_THRESHOLD) {
+    satPenalty = Math.min((standSatCount - (STAND_SATURATION_THRESHOLD - 1)) * 0.12, 0.40);
+  }
+
+  // Cannibalization: player in same neighborhood as stand today
+  var playerLocId = nbds[G.location].id;
+  if (playerLocId === standLocId) {
+    G._standOverlapCount = (G._standOverlapCount || 0) + 1;
+    satPenalty = Math.min(satPenalty + 0.15, 0.55);
+    if (G._standOverlapCount === 2 && !G._cannibalizationTaught) {
+      G._cannibalizationTaught = true;
+      enqueueModal('tip', function() {
+        showAdvisor(
+          'You and ' + emp.name + ' are both selling in <strong>' + standLoc.name + '</strong> today \u2014 you\u2019re competing with yourself!<br><br>Two sellers in the same spot means prices drop faster for both of you. Try working a different neighborhood.',
+          'Got it!',
+          null,
+          MAEVE_TEACHING
+        );
+      });
+    }
+  }
+
+  // Sell from stand inventory
+  var totalUnitsSold = 0;
+  var totalRevenue = 0;
+  var prods = getProducts();
+  var totalStandStock = 0;
+  prods.forEach(function(p) { totalStandStock += (G.standInventory[p.id] || 0); });
+
+  if (totalStandStock > 0) {
+    var baseUnits = Math.round(emp.dailySalesRate * (1 - satPenalty));
+    var unitsToSell = Math.min(baseUnits, totalStandStock);
+    prods.forEach(function(p) {
+      var stock = G.standInventory[p.id] || 0;
+      if (stock <= 0 || unitsToSell <= 0) return;
+      var share = Math.min(Math.round((stock / totalStandStock) * unitsToSell), stock);
+      if (share <= 0) return;
+      var sellPrice = (G.prices[standLocId] && G.prices[standLocId][p.id])
+        ? Math.round(G.prices[standLocId][p.id].sell * (1 - satPenalty) * 100) / 100
+        : 0;
+      if (sellPrice <= 0) return;
+      G.standInventory[p.id] -= share;
+      var rev = Math.round(share * sellPrice * 100) / 100;
+      G.cash = Math.round((G.cash + rev) * 100) / 100;
+      G.totalRevenue = Math.round((G.totalRevenue + rev) * 100) / 100;
+      totalUnitsSold += share;
+      totalRevenue += rev;
+      G.employeeTotalSales = (G.employeeTotalSales || 0) + share;
+      G.employeeTotalRevenue = Math.round(((G.employeeTotalRevenue || 0) + rev) * 100) / 100;
+      G.standSalesHistory = G.standSalesHistory || [];
+      G.standSalesHistory.push({ product: p.id, qty: share, price: sellPrice, day: G.day });
+    });
+  }
+
+  var saturatingNote = standSatCount >= STAND_SATURATION_THRESHOLD
+    ? ' <span style="color:#8a6a3a;font-size:.8em">(Market slowing)</span>' : '';
+  if (totalUnitsSold > 0) {
+    G._standLastResult = emp.name + ' sold <strong>' + totalUnitsSold + ' unit' + (totalUnitsSold !== 1 ? 's' : '') + '</strong> today ($' + totalRevenue.toFixed(2) + ').' + saturatingNote;
+  } else {
+    G._standLastResult = emp.name + ' showed up but had nothing to sell.';
+  }
+}
+
+// ===== WEEKLY STAND ALLOCATION (Phase C) =====
+function showWeeklyStandAllocation(onComplete) {
+  if (!G.employee || G.standLocation === null || G.standLocation === undefined) {
+    onComplete(); return;
+  }
+  var emp = G.employee;
+  var locName = getNeighborhoods()[G.standLocation].name;
+  var app = document.getElementById('app');
+
+  function computeStandFree() {
+    var st = 0;
+    getProducts().forEach(function(p) { st += (G.standInventory[p.id] || 0); });
+    return STAND_CAPACITY - st;
+  }
+
+  function renderAlloc() {
+    var st = 0;
+    getProducts().forEach(function(p) { st += (G.standInventory[p.id] || 0); });
+    var sf = STAND_CAPACITY - st;
+    var rows = '';
+    getProducts().forEach(function(p) {
+      var wQty = G.inventory[p.id] || 0;
+      var sQty = G.standInventory[p.id] || 0;
+      if (wQty <= 0 && sQty <= 0) return;
+      var canMove = wQty > 0 && sf > 0;
+      var maxAdd = Math.min(wQty, sf);
+      rows += '<div class="card" style="padding:10px;margin-bottom:6px">' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">' +
+          '<span class="card-title" style="font-family:\'Patrick Hand\',cursive">' + p.emoji + ' ' + p.name + '</span>' +
+          '<span style="font-size:.75rem;color:#6b5b4a">Wagon: <strong>' + wQty + '</strong> &nbsp;|&nbsp; Stand: <strong>' + sQty + '</strong></span>' +
+        '</div>' +
+        '<div style="display:flex;gap:6px">' +
+          '<button class="btn btn-primary btn-sm" onclick="moveToStand(\'' + p.id + '\',1)" ' + (canMove ? '' : 'disabled') + '>+1</button>' +
+          '<button class="btn btn-primary btn-sm" onclick="moveToStand(\'' + p.id + '\',5)" ' + (canMove && maxAdd >= 5 ? '' : 'disabled') + '>+5</button>' +
+          '<button class="btn btn-primary btn-sm" onclick="moveToStand(\'' + p.id + '\',' + maxAdd + ')" ' + (canMove ? '' : 'disabled') + '>+All (' + maxAdd + ')</button>' +
+        '</div>' +
+        '</div>';
+    });
+    if (!rows) rows = '<div class="banner banner-warn" style="text-align:center">Your wagon is empty \u2014 buy stock on the Buy tab first.</div>';
+    document.getElementById('stand-alloc-rows').innerHTML =
+      '<div class="banner ' + (sf > 0 ? 'banner-info' : 'banner-warn') + '" style="font-size:.8rem;margin-bottom:8px">Stand: <strong>' + st + ' / ' + STAND_CAPACITY + '</strong> \u00a0|\u00a0 ' + sf + ' slot' + (sf !== 1 ? 's' : '') + ' free</div>' + rows;
+  }
+
+  app.innerHTML = '<div style="padding:12px;max-width:480px;margin:0 auto">' +
+    '<div class="banner banner-info" style="font-size:.95rem;margin-bottom:10px">Restock ' + emp.name + '\u2019s Stand \u2014 ' + locName + '</div>' +
+    '<p style="font-size:.82rem;color:#6b5b4a;margin:0 0 10px;line-height:1.5">Move inventory from your wagon to ' + emp.name + '\u2019s stand (up to <strong>' + STAND_CAPACITY + ' slots</strong>).</p>' +
+    '<div id="stand-alloc-rows"></div>' +
+    '<button id="stand-alloc-done" class="btn btn-primary" style="width:100%;margin-top:14px" onclick="confirmStandAllocation()">Done</button>' +
+    '</div>';
+  renderAlloc();
+  window._renderStandAlloc = renderAlloc;
+  window._standAllocFree = computeStandFree;
+  modalVisible = true;
+}
+
+window.moveToStand = function(productId, qty) {
+  var n = qty || 1;
+  var avail = G.inventory[productId] || 0;
+  var free = window._standAllocFree ? window._standAllocFree() : 0;
+  var actual = Math.min(n, avail, free);
+  if (actual <= 0) return;
+  G.inventory[productId] = avail - actual;
+  G.standInventory[productId] = (G.standInventory[productId] || 0) + actual;
+  if (window._renderStandAlloc) window._renderStandAlloc();
+};
+window.moveFromStand = function(productId) {
+  if ((G.standInventory[productId] || 0) <= 0) return;
+  G.standInventory[productId]--;
+  G.inventory[productId] = (G.inventory[productId] || 0) + 1;
+  if (window._renderStandAlloc) window._renderStandAlloc();
+};
+window.confirmStandAllocation = function() {
+  window._renderStandAlloc = null;
+  window._standAllocFree = null;
+  // If we're in the bank visit flow, continue there; otherwise just render.
+  // onModalClosed() handles modalVisible=false and pumps the queue cleanly.
+  if (window._pendingBankVisitContinue) {
+    var cont = window._pendingBankVisitContinue;
+    window._pendingBankVisitContinue = null;
+    modalVisible = false;
+    cont();
+  } else {
+    render();
+    onModalClosed();
+  }
+};
 
 // ===== BICYCLE (Tier 1-2 "Wheels", Phase B) =====
 // Surfaced constants per DesignSpec v3 (Decisions 1-2). Tuning happens in Phase F.
@@ -830,6 +1231,7 @@ function newGame(mode) {
   modalVisible = false;
   const days = mode === 'starter' ? 15 : 30;
   G = {
+    startTime: Date.now(),
     mode, days, day:1, cash:50, location:0,
     inventory:{}, netWorth:50, netWorthHistory:[50],
     wagonCapacity:50, wagonUpgradeIndex:0,
@@ -892,6 +1294,7 @@ function startCareerMode(carryOver, level) {
   const prevEquipmentFund = carryOver.equipmentFund || 0;
 
   G = {
+    startTime: Date.now(),
     mode: 'full', days: 30, day: 1, cash: prevCash, location: 0,
     inventory: {}, netWorth: 0, netWorthHistory: [],
     wagonCapacity: prevWagon, wagonUpgradeIndex: prevUpgradeIndex,
@@ -915,6 +1318,23 @@ function startCareerMode(carryOver, level) {
     calSkill: 0.3,
     // Career Mode fields
     isCareer: true, careerLevel: careerLevel, profitStreak: 0, bestProfitStreak: prevBestProfitStreak,
+    // v19p (Phase B): employee — set by hireEmployee() in 1-3; null in 1-1 and 1-2.
+    employee: null,
+    // v19q (Phase C): Home Stand state. standLocation = neighborhood index chosen
+    // at hire; standInventory = per-product units at the stand; standVisits = array
+    // of { day } records for stand saturation tracking; employeeTotalSales/Revenue
+    // accumulate for Phase D end-screen summary.
+    standLocation: null,
+    standInventory: null,
+    standVisits: [],
+    employeeTotalSales: 0,
+    employeeDaysWorked: 0,   // v19v (Phase D): days employee actually showed up
+    employeeTotalRevenue: 0,
+    employeeTotalWagesPaid: 0,
+    standSalesHistory: [],
+    _standLastResult: null,
+    _standOverlapCount: 0,
+    _cannibalizationTaught: false,
     // v18a (Phase B): bicycle state. Only purchasable/shown in tier 1-2 (Wheels).
     // owned = has the player bought it; dailyMode = 'walk' | 'bike' chosen each day
     // (defaults forward to yesterday's choice). The two-visits-per-day travel
@@ -952,6 +1372,18 @@ function startCareerMode(carryOver, level) {
   // 1-1 greeting below is untouched. The bicycle is NOT described here yet —
   // its teaching beats arrive in Phase C. For now this just welcomes the player
   // to the new level by its correct name instead of mislabeling it 1-1.
+  // v19n (Phase A): Level 1-3 "The Team" greeting. Returns early so existing
+  // 1-1 and 1-2 greetings are untouched. Employee hiring screen arrives in
+  // Phase B — this greeting sets the scene and plants the concept of delegation.
+  if (careerLevel === '1-3') {
+    const msg =
+      'You\u2019ve come a long way, ' + playerNameLocal + '. <strong>' + bizName + '</strong> earned an A in Wheels \u2014 you\u2019ve proven you can run the route.<br><br>' +
+      'Welcome to <strong>Career Mode, Level 1-3: The Team</strong>. This season is different. You\u2019re not going to do everything yourself anymore.<br><br>' +
+      'You\u2019re going to hire someone. They\u2019ll run a stand in one neighborhood while you keep working the streets. Two sellers, one business.<br><br>' +
+      'Everything you built came with you \u2014 your cash, your wagon, and your savings. Let\u2019s meet your candidates.';
+    showAdvisor(msg, 'Meet the Candidates!', showHiringScreen);
+    return;
+  }
   if (careerLevel === '1-2') {
     let msg =
       'Look at you \u2014 <strong>' + bizName + '</strong> earned an A in The Hustle. That\u2019s why you\u2019re moving up.<br><br>' +
@@ -985,10 +1417,10 @@ function startCareerMode(carryOver, level) {
 
 // ===== PERSISTENCE =====
 function loadPersonalBest(mode) {
-  try { return parseFloat(localStorage.getItem('fptp_pb_'+mode)) || 50; } catch(e){ return 50; }
+  try { return parseFloat(localStorage.getItem('nm_pb_'+mode)) || 50; } catch(e){ return 50; }
 }
 function savePersonalBest(mode, val) {
-  try { localStorage.setItem('fptp_pb_'+mode, val); } catch(e){}
+  try { localStorage.setItem('nm_pb_'+mode, val); } catch(e){}
 }
 
 // ===== PRICE ENGINE =====
@@ -1236,6 +1668,8 @@ function advanceDay(skipEvent) {
   }
   G.arrivedViaTravel = G._willArrive || false;
   G._willArrive = false;
+  // v19q (Phase C): process the Home Stand for 1-3 each day.
+  if (G.isCareer && G.careerLevel === '1-3') { processStandDay(); }
   G.activeEffects = {};
   if (G.day > G.days) { endGame(); return; }
   generatePrices();
@@ -1287,13 +1721,23 @@ function advanceDay(skipEvent) {
 }
 
 function updateNetWorth() {
-  let invValue = 0;
+  var invValue = 0;
   const loc = getNeighborhoods()[G.location].id;
   getProducts().forEach(p => {
     if (G.inventory[p.id] > 0 && G.prices[loc] && G.prices[loc][p.id]) {
       invValue += G.inventory[p.id] * G.prices[loc][p.id].sell;
     }
   });
+  // v19q (Phase C): also count stand inventory at stand location prices
+  if (G.isCareer && G.careerLevel === '1-3' && G.standInventory && G.standLocation !== null && G.standLocation !== undefined) {
+    var standLocId = getNeighborhoods()[G.standLocation].id;
+    getProducts().forEach(function(p) {
+      var qty = G.standInventory[p.id] || 0;
+      if (qty > 0 && G.prices[standLocId] && G.prices[standLocId][p.id]) {
+        invValue += qty * G.prices[standLocId][p.id].sell;
+      }
+    });
+  }
   // Net Worth = Cash + Savings + Inventory Value
   // Savings is real wealth too — without including it, players who save would
   // see their net worth artificially decrease, undermining the savings lesson.
@@ -1691,6 +2135,16 @@ function calculateInterest() {
 }
 
 function showBankVisit() {
+  // v19q (Phase C): for 1-3, show stand allocation first, then resume savings.
+  if (G.isCareer && G.careerLevel === '1-3' && G.standLocation !== null && G.standLocation !== undefined) {
+    window._pendingBankVisitContinue = function() { _showBankVisitCore(); };
+    setTimeout(function() { showWeeklyStandAllocation(function() { _showBankVisitCore(); }); }, 0);
+    return;
+  }
+  _showBankVisitCore();
+}
+
+function _showBankVisitCore() {
   G.bankVisitShown = true;
   G.totalWeeks++;
   G._weekSavedCredited = false; // v18q (Phase E): track whether THIS week has
@@ -2120,6 +2574,7 @@ function closeFundAck() {
 
 // ===== END GAME =====
 function endGame() {
+  G.endTime = Date.now();
   G.gameOver = true;
   updateNetWorth();
   const pbKey = G.isCareer ? ('career_' + (G.careerLevel || '1-1').replace('-', '_')) : G.mode;
@@ -2128,6 +2583,132 @@ function endGame() {
     savePersonalBest(pbKey, G.netWorth);
   }
   render();
+}
+
+function generateSessionJSON() {
+  const startNW = G.netWorthHistory[0] || 50;
+  const scores = calculateGradeFactors();
+  
+  // Aggregate buyHistory by product
+  const productsBought = {};
+  (G.buyHistory || []).forEach(b => {
+    if (!productsBought[b.product]) productsBought[b.product] = 0;
+    productsBought[b.product] += b.qty;
+  });
+  
+  return {
+    schemaVersion: '1.0',
+    gameVersion: 'v19m',
+    sourceFile: 'Tier1',
+    tier: G.isCareer ? (G.careerLevel || '1-1') : '1-1',
+    mode: G.mode,
+    completionStatus: G.gameOver ? 'complete' : 'incomplete',
+    
+    player: {
+      playerName: playerInfo.playerName || '',
+      businessName: playerInfo.businessName || '',
+    },
+    
+    session: {
+      startTimestamp: G.startTime || Date.now(),
+      endTimestamp: G.endTime || Date.now(),
+      daysCompleted: G.day,
+      daysScheduled: G.days
+    },
+    
+    transactions: {
+      sellHistory: G.sellHistory || [],
+      buyHistory: G.buyHistory || [],
+      savingsHistory: G.savingsHistory || []
+    },
+    
+    encounters: G.encounters || [],
+
+    // v19n: eventChoices exported for Dashboard Phase C (Decision Coherence metric).
+    // Records the player's choice index for each antagonist event that offered a decision.
+    // crawley1: 0=mow lawn, 1=ignore. davis2: 0=pay fine now, 1=defer.
+    // eddie1: 0=compete, 1=pay to leave. crawley1_fined: boolean (fine applied on ignore path).
+    eventChoices: (typeof eventChoices !== 'undefined') ? Object.assign({}, eventChoices) : {},
+
+    progression: {
+      netWorthHistory: G.netWorthHistory || [],
+      locationsVisited: G.locationsVisited || {},
+      productsBought: productsBought,
+      productsSold: G.productsSold || {},
+      aggregates: {
+        totalRevenue: G.totalRevenue || 0,
+        totalProfit: G.netWorth - startNW,
+        tipCount: G.tipCount || 0,
+        tipSpend: G.tipSpend || 0,
+        travelCount: G.travelCount || 0,
+        wagonCapacity: G.wagonCapacity || 0,
+        savings: G.savings || 0,
+        totalInterestEarned: G.totalInterestEarned || 0,
+        weeksSaved: G.weeksSaved || 0
+      }
+    },
+
+    // v19v (Phase D): employee stats and profile — only populated for 1-3 Career games with a hired employee.
+    // employeeStats mirrors the four lines on the Stats tab.
+    // employeeProfile captures the hired candidate for Dashboard display.
+    employeeStats: (G.isCareer && G.careerLevel === '1-3' && G.employee) ? {
+      totalSales: G.employeeTotalSales || 0,
+      totalRevenue: Math.round((G.employeeTotalRevenue || 0) * 100) / 100,
+      wagesPaid: Math.round((G.employeeTotalWagesPaid || 0) * 100) / 100,
+      netFromStand: Math.round(((G.employeeTotalRevenue || 0) - (G.employeeTotalWagesPaid || 0)) * 100) / 100
+    } : null,
+
+    employeeProfile: (G.isCareer && G.careerLevel === '1-3' && G.employee) ? {
+      name: G.employee.name,
+      candidateId: G.employee.id,
+      dailyWage: G.employee.wage,
+      daysWorked: G.employeeDaysWorked || 0,
+      showUpRateBase: G.employee.showUpRate,
+      showUpRateAfterTraining: G.employee.trainedShowUpRate || G.employee.showUpRate,
+      trained: !!G.employee.trained
+    } : null,
+
+    grade: {
+      composite: scores.composite,
+      nwScore: scores.nwScore,
+      marginScore: scores.marginScore,
+      divScore: scores.divScore,
+      researchScore: scores.researchScore,
+      travelScore: scores.travelScore,
+      savingsScore: scores.savingsScore,
+      growthTarget: G.mode === 'starter' ? 100 : (G.isCareer && G.careerLevel === '1-3') ? 500 : 400,
+      startingNetWorth: startNW
+    }
+  };
+}
+
+function downloadSessionJSON() {
+  try {
+    const json = generateSessionJSON();
+    const jsonStr = JSON.stringify(json, null, 2);
+    const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8' });
+    
+    // Sanitize filename
+    const bizName = (playerInfo.businessName || 'session')
+      .replace(/[^a-zA-Z0-9_\-]/g, '_')
+      .substring(0, 30);
+    const dateStr = new Date().toISOString().split('T')[0];
+    const filename = `${bizName}_${dateStr}.json`;
+    
+    // Create download link
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    console.error('Download error:', e);
+    alert('Error downloading session: ' + e.message);
+  }
 }
 
 // v18a: shared carryover snapshot used by every Career entry path
@@ -2222,7 +2803,7 @@ function calculateGradeFactors() {
   // === NET WORTH (38%) ===
   // Net worth scoring: measure growth from starting position
   const startingNW = G.netWorthHistory[0] || 50;
-  const growthTarget = G.mode === 'starter' ? 100 : 400; // Starter: grow by $100; Full/Career: grow by $400
+  const growthTarget = G.mode === 'starter' ? 100 : (G.isCareer && G.careerLevel === '1-3') ? 500 : 400; // Starter: $100; 1-3: $500; Full/Career default: $400
   const actualGrowth = G.netWorth - startingNW;
   const nwScore = Math.min(100, Math.max(0, (actualGrowth / growthTarget) * 100));
 
@@ -2251,16 +2832,12 @@ function calculateGradeFactors() {
 
   // === MARKET RESEARCH (10%) ===
   let researchScore;
-  // Ideal tip band by mode. Starter 4-7, Full 7-12, Career 8-12.
-  // v18q (Phase E): Career floor raised 7 -> 8 to match CareerModeMap (Wheels
-  // specifies an 8-12 ideal). Full Market is not a Career level, so it is left
-  // at 7-12 and Starter at 4-7 — this change is scoped to Career only.
-  const idealTipsMin = G.mode === 'starter' ? 4 : (G.isCareer ? 8 : 7);
-  const idealTipsMax = G.mode === 'starter' ? 7 : 12;
-  if (G.tipCount === 0) researchScore = 10;
-  else if (G.tipCount < idealTipsMin) researchScore = 50;
-  else if (G.tipCount <= idealTipsMax) researchScore = 100;
-  else researchScore = 70; // overspending on research
+  // v19n: Tip mechanic pending rebuild — score reflects engagement only, not quality of use.
+  // Zero tips = neutral (50, no penalty). Any tips = modest recognition of initiative (65).
+  // Upper tier and ideal-range logic deferred until mechanic is reliable enough to measure
+  // actual benefit. Prior idealTipsMin/Max tiers and overspend penalty removed.
+  if (G.tipCount === 0) researchScore = 50;
+  else researchScore = 65;
 
   // === TRAVEL / MARKET ACCESS (5%) ===
   const uniqueLocations = Object.keys(G.locationsVisited).length;
@@ -2307,8 +2884,10 @@ function getGradeExplanation(scores) {
   else if (scores.divScore >= 50) {} // middle ground, skip
   else improvements.push('Try trading more product types. Diversification protects you when one product\u2019s price drops.');
 
-  if (scores.researchScore >= 80) strengths.push('Smart use of market research \u2014 paying for information helped guide your decisions.');
-  else if (scores.researchScore <= 20) improvements.push('You never bought market research. Spending a little on information can lead to much better trades.');
+  // v19n: Research score is 50 (no tips, neutral) or 65 (any tips, modest reward).
+  // Strength fires for kids who tried the tool. No improvement message — we do not
+  // penalise kids for not using a mechanic that is pending a proper rebuild.
+  if (scores.researchScore >= 60) strengths.push('You tried market research \u2014 looking for information before making decisions is a smart habit.');
 
   if (scores.travelScore >= 80) strengths.push('Great market access \u2014 you explored multiple neighborhoods to find the best deals.');
   else if (scores.travelScore <= 30) improvements.push('Try visiting more neighborhoods. Different markets have different prices \u2014 that\u2019s where opportunity lives.');
@@ -2353,7 +2932,7 @@ let advisorState = { tutorialStep: 0, shownTips: {} };
 //   3 = tutorial step
 //   4 = contextual tip (wagon, etc.)
 // ============================================================
-const MODAL_PRIORITY = { event: 1, bank: 2, tutorial: 3, tip: 4 };
+const MODAL_PRIORITY = { alloc: 0, event: 1, bank: 2, tutorial: 3, tip: 4 };
 let modalQueue = [];
 let _pumpScheduled = false;
 
@@ -2421,7 +3000,8 @@ function showAdvisor(message, buttonText, onClose, avatarImg) {
     </div>
   </div>`;
   document.body.appendChild(overlay);
-  document.getElementById('advisorBtn').onclick = function() {
+  var advisorBtn = document.getElementById('advisorBtn');
+  advisorBtn.onclick = function() {
     overlay.remove();
     if (onClose) onClose();
     else render();
@@ -3076,6 +3656,7 @@ function render() {
     ${G.soldToday && G.mode === 'full' && G.boughtHere ? '<div class="banner banner-info">Stocked up! Travel to a new neighborhood to sell.</div>' : ''}
     ${G.soldToday && G.mode === 'starter' ? '<div class="banner banner-warn"> Done selling. Travel or Stay to advance.</div>' : ''}
     ${(() => { const c = saturationDays(G.location); return c >= saturationThreshold() ? `<div class="banner banner-warn">Market saturation in <strong>${getNeighborhoods()[G.location].name}</strong> \u2014 your sell prices here are down. Try selling somewhere else for a few days.</div>` : ''; })()}
+    ${(G.isCareer && G.careerLevel === '1-3' && G._standLastResult) ? `<div class="banner banner-info" style="font-size:.82rem">\ud83c\udfe0 ${G._standLastResult}</div>` : ''}
     ${G.upgradeBannerUntil && Date.now() < G.upgradeBannerUntil ? `<div class="banner banner-info">Wagon upgraded! Your capacity is now <strong>${G.upgradeBannerCapacity} slots</strong>. Use that extra space wisely!</div>` : ''}
     ${(G.mode === 'starter' || (G.mode === 'full' && !G.isCareer)) && G.wagonTipBannerUntil && Date.now() < G.wagonTipBannerUntil && upgrade ? `<div class="banner banner-info">New! You can <strong>invest in a bigger wagon</strong> below \u2014 more space means you can carry more to sell.</div>` : ''}
     ${(G.mode === 'starter' || (G.mode === 'full' && !G.isCareer)) && G.researchTipBannerActive && G.tipCount === 0 ? `<div class="banner banner-info">Tip: the <strong>Market Research</strong> button on the Map tab can reveal good prices for a small fee.</div>` : ''}
@@ -3363,13 +3944,27 @@ function renderTravelTab() {
 }
 
 function renderItemsTab() {
-  return `<div class="flex-between mb-2"><h3>Inventory</h3><span class="text-muted">${totalInventory()} / ${G.wagonCapacity} slots</span></div>
+  // Stand section: only in 1-3 after a stand location has been chosen
+  var standSection = '';
+  if (G.isCareer && G.careerLevel === '1-3' && G.standLocation !== null && G.standLocation !== undefined && G.standInventory) {
+    var empName = G.employee ? G.employee.name : '';
+    var standTotal = 0;
+    getProducts().forEach(function(p) { standTotal += (G.standInventory[p.id] || 0); });
+    var standTiles = getProducts().filter(function(p) { return G.unlocked.includes(p.id) && (G.standInventory[p.id] || 0) > 0; }).map(function(p) {
+      return '<div class="inv-item"><div class="emoji">' + p.emoji + '</div><div class="name">' + p.name + '</div><div class="count">' + (G.standInventory[p.id] || 0) + '</div></div>';
+    }).join('');
+    var emptyMsg = standTiles === '' ? '<div class="banner banner-warn" style="text-align:center;grid-column:1/-1">Stand is empty \u2014 stock it from Manage Stand.</div>' : standTiles;
+    standSection = '<div class="flex-between mb-2" style="margin-top:14px"><h3>' + (empName ? empName + '\u2019s Stand' : 'At the Stand') + '</h3><span class="text-muted">' + standTotal + ' / ' + STAND_CAPACITY + ' slots</span></div>'
+      + '<div class="inv-grid" style="margin-bottom:10px">' + emptyMsg + '</div>'
+      + '<button class="btn btn-primary" style="width:100%;font-size:.85rem" onclick="showWeeklyStandAllocation(function(){ render(); })">\ud83c\udfe0 Manage ' + (empName ? empName + '\u2019s' : '') + ' Stand</button>';
+  }
+  return `<div class="flex-between mb-2"><h3>My Wagon</h3><span class="text-muted">${totalInventory()} / ${G.wagonCapacity} slots</span></div>
   <div class="wagon-bar" style="margin-bottom:8px"><div class="wagon-fill ${wagonPercent()>90?'full':wagonPercent()>70?'warning':''}" style="width:${Math.min(wagonPercent(),100)}%"></div></div>
   <div class="inv-grid">${getProducts().filter(p => G.unlocked.includes(p.id)).map(p => `<div class="inv-item">
     <div class="emoji">${p.emoji}</div>
     <div class="name">${p.name}</div>
     <div class="count">${G.inventory[p.id]}</div>
-  </div>`).join('')}</div>`;
+  </div>`).join('')}</div>` + standSection;
 }
 
 function renderStatsTab() {
@@ -3403,7 +3998,13 @@ function renderStatsTab() {
   <div class="end-stat"><span>Market Research</span><span>${G.tipCount} tips ($${G.tipSpend})</span></div>
   <div class="end-stat"><span>vs. Best</span><span style="${pbClass};font-weight:800">${pbDiff>=0?'+':''}$${pbDiff.toFixed(2)}</span></div>
   <div class="chart-container"><canvas id="sparkline" height="120"></canvas></div>
-  ${G.encounters.length > 0 ? '<h3 class="mt-2">Encounters</h3>' + G.encounters.map(e => `<div class="encounter"><span class="emoji">${e.emoji}</span><span><strong>${e.name}</strong> \u2014 ${e.eventName} (Day ${e.day})</span></div>`).join('') : ''}`;
+  ${G.encounters.length > 0 ? '<h3 class="mt-2">Encounters</h3>' + G.encounters.map(e => `<div class="encounter"><span class="emoji">${e.emoji}</span><span><strong>${e.name}</strong> \u2014 ${e.eventName} (Day ${e.day})</span></div>`).join('') : ''}
+  ${(G.isCareer && G.careerLevel === '1-3' && G.standLocation !== null && G.standLocation !== undefined) ? `<h3 class="mt-2">${G.employee ? G.employee.name + '\u2019s Stand' : 'Stand'}</h3>
+  <div class="end-stat"><span>${G.employee ? G.employee.name + '\u2019s Total Sales' : 'Total Sales'}</span><span>${(G.employeeTotalSales || 0)} units</span></div>
+  <div class="end-stat"><span>${G.employee ? G.employee.name + '\u2019s Revenue' : 'Revenue'}</span><span>$${(G.employeeTotalRevenue || 0).toFixed(2)}</span></div>
+  <div class="end-stat"><span>Wages Paid</span><span style="color:#b83a2a">-$${(G.employeeTotalWagesPaid || 0).toFixed(2)}</span></div>
+  <div class="end-stat"><span>Net from Stand</span><span style="font-weight:800;color:${((G.employeeTotalRevenue || 0) - (G.employeeTotalWagesPaid || 0)) >= 0 ? '#5a7a4a' : '#b83a2a'}">${((G.employeeTotalRevenue || 0) - (G.employeeTotalWagesPaid || 0)) >= 0 ? '+' : ''}$${((G.employeeTotalRevenue || 0) - (G.employeeTotalWagesPaid || 0)).toFixed(2)}</span></div>
+  <div style="margin-top:14px"><button class="btn btn-primary" style="width:100%;font-size:.85rem" onclick="showWeeklyStandAllocation(function(){ render(); })">\ud83c\udfe0 Manage ${G.employee ? G.employee.name + '\u2019s' : ''} Stand</button></div>` : ''}`;
 }
 
 // ===== START SCREEN =====
@@ -3419,6 +4020,7 @@ function renderStart(app) {
         <div style="height:14px"></div>
         <label class="name-label">Your Business Name</label>
         <input type="text" id="bizNameInput" class="name-input" placeholder="Name your business" maxlength="30">
+        <div style="height:14px"></div>
       </div>
       <div class="tos-check">
         <input type="checkbox" id="tosCheckbox">
@@ -3431,46 +4033,9 @@ function renderStart(app) {
     return;
   }
 
-  // Names are set — show mode selection
-  const pbStarter = loadPersonalBest('starter');
-  const pbFull = loadPersonalBest('full');
-  app.innerHTML = `<div class="start-screen">
-    <h1>${playerInfo.businessName}</h1>
-    <p class="subtitle">Owner: ${playerInfo.playerName}</p>
-    <p class="text-muted" style="margin:8px 0">Start with $50 in capital and a wagon (50 slots). Buy low, sell high, grow your business!</p>
-    <h2 style="margin-top:12px">Choose Your Mode</h2>
-    <div class="mode-card" onclick="startCalibration('starter')">
-      <h3> Starter Mode</h3>
-      <div class="mode-detail"><span class="label">Duration:</span> 15 days</div>
-      <div class="mode-detail"><span class="label">Goal:</span> Grow your net worth and learn the basics</div>
-      <div class="mode-detail"><span class="label">How to play:</span></div>
-      <ul class="mode-list">
-        <li>Buy and sell goods like lemonade, cookies, and toys across 4 neighborhoods</li>
-        <li>Start with a couple of products and unlock new ones every few days</li>
-        <li>You can buy and sell in the same location</li>
-      </ul>
-      <p class="text-muted" style="font-size:.72rem;margin-top:4px">Best for ages 8\u201312 or anyone new to business games.</p>
-    </div>
-    <div class="mode-card" onclick="startCalibration('full')">
-      <h3> Full Market Mode</h3>
-      <div class="mode-detail"><span class="label">Duration:</span> 30 days</div>
-      <div class="mode-detail"><span class="label">Goal:</span> Maximize profit and master the market</div>
-      <div class="mode-detail"><span class="label">How to play:</span></div>
-      <ul class="mode-list">
-        <li>All 6 products available from day 1</li>
-        <li>You must travel to a new neighborhood before you can sell</li>
-        <li>Every purchase is a bet \u2014 you won\u2019t know sell prices until you arrive</li>
-        <li>The market adapts to how you play</li>
-      </ul>
-      <p class="text-muted" style="font-size:.72rem;margin-top:4px">The full experience for experienced players, teachers, and classrooms.</p>
-    </div>
-    <p class="text-muted" style="margin-top:10px;font-size:.7rem;cursor:pointer;text-decoration:underline" onclick="playerInfo.playerName='';playerInfo.businessName='';render()">Change name / business</p>
-    ${!PUBLIC_BUILD ? `<div style="margin-top:14px;padding:8px 10px;border:1px dashed #c08a40;border-radius:8px;background:#fdf6ec">
-      <div style="font-size:.68rem;font-weight:800;color:#9a6a1a;letter-spacing:.5px;text-transform:uppercase;margin-bottom:5px">Dev shortcuts (not in public build)</div>
-      <button class="btn btn-tip" style="width:100%;margin-bottom:5px;font-size:.74rem" onclick="devJumpToCareer('1-1')">Jump to Career 1-1: The Hustle</button>
-      <button class="btn btn-tip" style="width:100%;font-size:.74rem" onclick="devJumpToCareer('1-2')">Jump to Career 1-2: Wheels</button>
-    </div>` : ''}
-  </div>`;
+  // Names are set — go straight to Maeve welcome screen
+  advisorState = { tutorialStep: 0, shownTips: {} };
+  showFullPreview();
 }
 
 function submitNames() {
@@ -3490,62 +4055,9 @@ function submitNames() {
   render();
 }
 
-// ===== STARTER MECHANICS PREVIEW (v17f, §6) =====
-// Advance organizer: tells the kid three GOOD things to watch for so the
-// later in-context cues are recognized, not surprising. Hard rule: preview
-// MECHANICS in plain kid-language, NOT vocabulary. Saturation and
-// opportunity-cost are deliberately NOT previewed (preserve the discovery
-// moment). Starter-only; Full Market keeps its calibration intro.
-function showStarterPreview() {
-  var app = document.getElementById('app');
-  var bizName = playerInfo.businessName || 'your business';
-  app.innerHTML = '<div style="padding:14px">' +
-    '<h1>Welcome to ' + bizName + '!</h1>' +
-    '<p class="subtitle" style="margin-bottom:14px">Here are three things to look out for as you play:</p>' +
-    '<div class="preview-card">' +
-      '<div class="preview-emoji">\uD83D\uDED2</div>' +
-      '<div><div class="preview-title">A bigger wagon</div>' +
-      '<div class="preview-desc">As you earn more, you can buy a bigger wagon to carry more stuff.</div></div>' +
-    '</div>' +
-    '<div class="preview-card">' +
-      '<div class="preview-emoji">\uD83D\uDD0D</div>' +
-      '<div><div class="preview-title">Market Research</div>' +
-      '<div class="preview-desc">Not sure where to sell? Tap the <strong>Market Research</strong> button to pay a little for a hint about good prices.</div></div>' +
-    '</div>' +
-    '<div class="preview-card">' +
-      '<div class="preview-emoji">\uD83C\uDFE6</div>' +
-      '<div><div class="preview-title">The banker</div>' +
-      '<div class="preview-desc">Every week, Mr. Ramos from the bank stops by to help you with your money.</div></div>' +
-    '</div>' +
-    '<button class="btn btn-primary btn-lg" style="width:100%;margin-top:14px" onclick="beginStarterGame()">Let\u2019s go! \u2192</button>' +
-  '</div>';
-}
 
-function beginStarterGame() {
-  newGame('starter');
-  setTimeout(function() { checkAdvisorTutorial(); }, 100);
-}
-
-// ===== SKILL CALIBRATION =====
-function startCalibration(mode) {
-  if (mode === 'starter') {
-    advisorState = { tutorialStep: 0, shownTips: {} };
-    showStarterPreview();
-    return;
-  }
-  // Full Market (v17g, Option B): the plain "I'm Maeve, ready?" intro is replaced
-  // by a preview-style screen with three "look out for" cards (parity with Starter),
-  // which then flows into the existing skill-calibration scenario. Career is NOT
-  // routed here in a way that changes its intro \u2014 Career has its own flow.
-  advisorState = { tutorialStep: 0, shownTips: {} };
-  showFullPreview();
-}
-
-// v17g: Option B preview screen for Full Market. Mirrors showStarterPreview's
-// three teaching cards (bigger wagon, Market Research, the banker \u2014 all shared
-// mechanics) but keeps Maeve's portrait framing and routes to calibration, not
-// straight into the game. This gives Full the preview's teaching value without
-// adding a third orientation screen.
+// ===== MAEVE WELCOME SCREEN =====
+// Shown immediately after name entry. Three teaching cards, then straight into game.
 function showFullPreview() {
   var app = document.getElementById('app');
   var bizName = playerInfo.businessName || 'your business';
@@ -3570,58 +4082,13 @@ function showFullPreview() {
       '<div><div class="preview-title">The banker</div>' +
       '<div class="preview-desc">Every week, Mr. Ramos from the bank stops by to help you with your money.</div></div>' +
     '</div>' +
-    '<button class="btn btn-primary btn-lg" style="width:100%;margin-top:14px" onclick="showCalibrationScreen()">Next \u2192</button>' +
+    '<button class="btn btn-primary btn-lg" style="width:100%;margin-top:14px" onclick="beginFullGame()">Let\u2019s go! \u2192</button>' +
   '</div>';
 }
 
-function showCalibrationScreen() {
-  var app = document.getElementById('app');
-  app.innerHTML = '<div style="padding:12px">' +
-    '<h1> Quick Scenario</h1>' +
-    '<p class="subtitle">This helps the game adjust to your experience level.</p>' +
-    '<p style="font-size:.85rem;color:#6b5b4a;margin:10px 0;line-height:1.5">Imagine you\u2019re starting a business with limited cash. You see two types of products:</p>' +
-    '<div style="display:flex;gap:8px;margin:10px 0 14px">' +
-      '<div style="flex:1;background:#f0e8d4;border-left:3px solid #5a7a4a;padding:8px 10px;border-radius:0 6px 6px 0">' +
-        '<div style="font-weight:800;font-size:.85rem;color:#5a7a4a"> Cheap Product</div>' +
-        '<div style="font-size:.75rem;color:#7a6a58;margin-top:2px">Low cost, low profit per sale, fills your wagon fast</div>' +
-      '</div>' +
-      '<div style="flex:1;background:#f0e8d4;border-left:3px solid #b85c2a;padding:8px 10px;border-radius:0 6px 6px 0">' +
-        '<div style="font-weight:800;font-size:.85rem;color:#b85c2a"> Expensive Product</div>' +
-        '<div style="font-size:.75rem;color:#7a6a58;margin-top:2px">High cost, big profit per sale, fewer units fit</div>' +
-      '</div>' +
-    '</div>' +
-    '<p class="text-muted" style="margin-bottom:6px;font-size:.75rem;text-align:center">Full Market: all 6 products \u2022 4 neighborhoods \u2022 30 days \u2022 must travel to sell</p>' +
-    '<h3 style="margin:10px 0 8px">What\u2019s your approach?</h3>' +
-    '<div class="mode-card" onclick="finishCalibration(\'full\', \'lemonade_all\')">' +
-      '<h3> Load up on the cheap stuff</h3>' +
-      '<p>Volume over margin \u2014 sell lots of small items</p>' +
-    '</div>' +
-    '<div class="mode-card" onclick="finishCalibration(\'full\', \'cookies_all\')">' +
-      '<h3> Go for the expensive product</h3>' +
-      '<p>Fewer units but bigger profit on each one</p>' +
-    '</div>' +
-    '<div class="mode-card" onclick="finishCalibration(\'full\', \'mix\')">' +
-      '<h3>Mix of both</h3>' +
-      '<p>Don\u2019t put all your eggs in one basket</p>' +
-    '</div>' +
-    '<div class="mode-card" onclick="finishCalibration(\'full\', \'save\')">' +
-      '<h3> Buy some, keep cash in reserve</h3>' +
-      '<p>Always keep a safety net for surprises</p>' +
-    '</div>' +
-  '</div>';
-}
-
-function finishCalibration(mode, choice) {
-  let skill = 0;
-  if (choice === 'mix') skill = 0.3;
-  if (choice === 'save') skill = 0.5;
-  if (choice === 'cookies_all') skill = 0.2;
-  if (choice === 'lemonade_all') skill = 0.0;
+function beginFullGame() {
   advisorState = { tutorialStep: 0, shownTips: {} };
-  newGame(mode);
-  G.calSkill = skill;
-  G.adaptive.skillScore = skill;
-  G.adaptive.volatilityMult = 1.0 + (skill * 0.2);
+  newGame('full');
   setTimeout(function() { checkAdvisorTutorial(); }, 100);
 }
 
@@ -3707,6 +4174,37 @@ function renderEnd(app) {
     <div class="end-stat"><span>Mode</span><span>${G.isCareer ? 'Career Mode ' + G.careerLevel + ': ' + careerLevelName(G.careerLevel) + ' (30 days)' : G.mode==='starter'?'Starter (15 days)':'Full Market (30 days)'}</span></div>
     ${G.isCareer ? '<div class="end-stat"><span>Best Profit Streak</span><span> ' + G.bestProfitStreak + ' in a row</span></div>' : ''}
     
+    ${(G.isCareer && G.careerLevel === '1-3' && G.employee) ? `
+    <h3 style="margin:14px 0 6px">Your Team</h3>
+    <div class="card" style="padding:10px;margin-bottom:6px">
+      <div class="card-header" style="margin-bottom:8px">
+        <span class="card-title">${G.employee.name}'s Stand</span>
+        <span style="font-size:.75rem;color:#8a7a68">${getNeighborhoods()[G.standLocation].name}</span>
+      </div>
+      <div class="end-stat"><span>${G.employee.name}'s Sales</span><span>${G.employeeTotalSales || 0} units</span></div>
+      <div class="end-stat"><span>${G.employee.name}'s Revenue</span><span>$${(G.employeeTotalRevenue || 0).toFixed(2)}</span></div>
+      <div class="end-stat"><span>Wages Paid</span><span style="color:#b83a2a">-$${(G.employeeTotalWagesPaid || 0).toFixed(2)}</span></div>
+      <div class="end-stat" style="border-top:1px solid #e0d6c2;margin-top:6px;padding-top:6px">
+        <span style="font-weight:700">Net from Stand</span>
+        <span style="font-weight:800;color:${((G.employeeTotalRevenue || 0) - (G.employeeTotalWagesPaid || 0)) >= 0 ? '#5a7a4a' : '#b83a2a'}">${((G.employeeTotalRevenue || 0) - (G.employeeTotalWagesPaid || 0)) >= 0 ? '+' : ''}$${((G.employeeTotalRevenue || 0) - (G.employeeTotalWagesPaid || 0)).toFixed(2)}</span>
+      </div>
+      ${((G.employeeTotalRevenue || 0) - (G.employeeTotalWagesPaid || 0)) < 0 ? `<div class="banner banner-warn" style="margin-top:8px;text-align:left">${G.employee.name}'s stand lost money this season \u2014 wages kept coming out even when the stand had nothing to sell. Next time, keep the stand stocked so ${G.employee.pronounSubject} can earn it back.</div>` : ''}
+    </div>
+    <div class="card" style="padding:10px;margin-bottom:6px">
+      <div class="card-header" style="margin-bottom:8px">
+        <span class="card-title">Combined Business</span>
+      </div>
+      <div class="end-stat"><span>Your Revenue</span><span>$${G.totalRevenue.toFixed(2)}</span></div>
+      <div class="end-stat"><span>${G.employee.name}'s Revenue</span><span>$${(G.employeeTotalRevenue || 0).toFixed(2)}</span></div>
+      <div class="end-stat" style="border-top:1px solid #e0d6c2;margin-top:6px;padding-top:6px">
+        <span style="font-weight:700">Combined Revenue</span>
+        <span style="font-weight:800">$${(G.totalRevenue + (G.employeeTotalRevenue || 0)).toFixed(2)}</span>
+      </div>
+      <div class="end-stat">
+        <span style="font-weight:700">Combined Profit</span>
+        <span style="font-weight:800;color:${((G.totalRevenue + (G.employeeTotalRevenue || 0)) - (G.employeeTotalWagesPaid || 0) - ((G.netWorthHistory[0] || 50) - G.netWorthHistory[0] || 0)) >= 0 ? '#5a7a4a' : '#b83a2a'}">$${(totalProfit + ((G.employeeTotalRevenue || 0) - (G.employeeTotalWagesPaid || 0))).toFixed(2)}</span>
+      </div>
+    </div>` : ''}
     <div class="chart-container"><canvas id="endChart" height="140"></canvas></div>
     
     ${Object.keys(antCounts).length > 0 ? `<h2>Who You Met</h2>${Object.values(antCounts).map(a => `<div class="who-met">${a.img ? `<img src="${a.img}" style="width:72px;height:72px;border-radius:50%;object-fit:cover">` : `<span class="emoji">${a.emoji}</span>`}<div><strong>${a.name}</strong> \u2014 ${a.title}<br><span class="text-muted">Appeared ${a.count} time${a.count>1?'s':''}</span></div></div>`).join('')}` : ''}
@@ -3718,12 +4216,14 @@ function renderEnd(app) {
     ${generateVocabRecap(G.isCareer ? G.taughtConcepts : []).map(v => `<div class="card" style="padding:8px 10px;margin-bottom:5px"><div class="flex-between"><span style="font-weight:700;font-size:.82rem;color:#2B4C7E">${v.term}</span>${v.isNew ? '<span class="badge badge-new">NEW</span>' : ''}</div><p style="font-size:.76rem;color:#5a4a3a;margin-top:3px;line-height:1.4">${v.def}</p></div>`).join('')}
     
     ${G.isCareer && (grade === 'A+' || grade === 'A') && G.careerLevel === '1-1' ? '<div class="upgrade-card" style="cursor:pointer" onclick="advanceToCareerLevel(\'1-2\')"><h3> Level Complete!</h3><p class="text-muted">You earned an A in Career Mode 1-1: The Hustle. Ready for <strong>Level 1-2: Wheels</strong>? Your cash, inventory, wagon, and savings carry forward.</p><button class="btn btn-primary" style="margin-top:6px">Continue to Level 1-2 \u2192</button></div>' : ''}
-    ${G.isCareer && (grade === 'A+' || grade === 'A') && G.careerLevel === '1-2' ? '<div class="upgrade-card"><h3> Level Complete!</h3><p class="text-muted">You earned an A in Career Mode 1-2: Wheels. Level 1-3 is coming soon!</p></div>' : ''}
+    ${G.isCareer && (grade === 'A+' || grade === 'A') && G.careerLevel === '1-2' ? '<div class="upgrade-card" style="cursor:pointer" onclick="advanceToCareerLevel(\'1-3\')"><h3> Level Complete!</h3><p class="text-muted">You earned an A in Career Mode 1-2: Wheels. Ready for <strong>Level 1-3: The Team</strong>? Your cash, inventory, wagon, and savings carry forward.</p><button class="btn btn-primary" style="margin-top:6px">Continue to Level 1-3 \u2192</button></div>' : ''}
+    ${G.isCareer && G.careerLevel === '1-3' && (grade === 'A+' || grade === 'A') && G.employee ? '<div class="upgrade-card" style="text-align:center"><h3>Season Complete!</h3><p class="text-muted">You earned an A running a two-person operation. You hired ' + G.employee.name + ', delegated the stand, and managed your labor costs. That\u2019s real business leadership.</p></div>' : ''}
+    ${G.isCareer && G.careerLevel === '1-3' && (grade === 'A+' || grade === 'A') && !G.employee ? '<div class="lesson-card" style="text-align:center">Great season! Hire an employee on your next run to unlock the full Team experience.</div>' : ''}
     ${G.isCareer && grade !== 'A+' && grade !== 'A' ? '<div class="lesson-card" style="text-align:center">You need an A grade to advance. Your current resources carry forward \u2014 try another season!</div>' : ''}
-    ${!PUBLIC_BUILD && !G.isCareer && G.mode === 'full' && (grade === 'A+' || grade === 'A') ? '<div class="upgrade-card" style="cursor:pointer" onclick="beginCareerMode()"><h3> Career Mode Unlocked!</h3><p class="text-muted">You\u2019ve proven yourself. Ready to go further? Your cash, inventory, and wagon carry forward.</p><button class="btn btn-primary" style="margin-top:6px">Continue to Career Mode \u2192</button></div>' : ''}
     ${G.isCareer ? '<button class="btn btn-primary btn-lg" style="width:100%;margin-top:10px" onclick="replayCareerSeason()">Play Another Season</button>' : ''}
+    <button class="btn btn-sell" style="width:100%;margin-top:8px" onclick="downloadSessionJSON()">Download Session as JSON</button>
     <button class="btn btn-tip" style="width:100%;margin-top:8px" onclick="G.viewingReport=true;render()">Get a Teacher/Parent Report</button>
-    ${PUBLIC_BUILD && !G.isCareer ? '<button class="btn btn-tip" style="width:100%;margin-top:8px" onclick="openFeedback()">Share Feedback</button>' : ''}
+    <button class="btn btn-tip" style="width:100%;margin-top:8px" onclick="openFeedback()">Share Feedback</button>
     <button class="btn ${G.isCareer ? 'btn-sell' : 'btn-primary btn-lg'}" style="width:100%;margin-top:8px" onclick="G={};render()">Back to Menu</button>
     <div class="copyright-footer">U.S. Patent Pending \u2022 \u00A9 2026 Franklyn Brent Frazier. All rights reserved.<br>Notebook Mogul\u2122 is a proprietary educational simulation.</div>
   </div>`;
@@ -3818,8 +4318,8 @@ function renderSessionReport(app) {
     const sells = G.sellHistory || [];
     if (tipsBought === 0) {
       return {
-        headline: `${name} did not buy market research this session.`,
-        detail: 'Market research helps spot the best places to sell — worth exploring next session.'
+        headline: `${name} did not use Market Research this session.`,
+        detail: 'That is a neutral choice — strong trading habits can succeed without it. The tool is available to explore in a future session.'
       };
     }
     if (sells.length === 0) {
@@ -3843,21 +4343,23 @@ function renderSessionReport(app) {
     });
     const avgMargin = totalUnits > 0 ? Math.round(totalMarginWeighted / totalUnits) : 0;
     const spend = G.tipSpend || 0;
+    // v19n: We cannot yet verify whether tip information was actionable or acted on
+    // (mechanic pending rebuild). Narratives reflect engagement only, not outcome.
     if (avgMargin >= 30) {
       return {
-        headline: `${name} bought research ${tipsBought} time${tipsBought === 1 ? '' : 's'} and finished with an average margin of ${avgMargin}%.`,
-        detail: `Strong sign they are using the research to find better selling neighborhoods.`
+        headline: `${name} tried market research ${tipsBought} time${tipsBought === 1 ? '' : 's'} and finished with a strong average margin of ${avgMargin}%.`,
+        detail: `Using available information tools alongside solid trading habits is a good sign. Note: the research tool is being updated — outcome links are not yet measurable.`
       };
     }
     if (avgMargin >= 0) {
       return {
-        headline: `${name} bought research ${tipsBought} time${tipsBought === 1 ? '' : 's'} ($${spend} spent) and finished with a ${avgMargin}% average margin.`,
-        detail: 'Some use of the tool, but the connection between research and better sales could be stronger.'
+        headline: `${name} tried market research ${tipsBought} time${tipsBought === 1 ? '' : 's'} ($${spend} spent) and finished with a ${avgMargin}% average margin.`,
+        detail: 'Reaching for available information is a positive habit. The connection between research and trading outcomes will be trackable in a future update.'
       };
     }
     return {
-      headline: `${name} bought research ${tipsBought} time${tipsBought === 1 ? '' : 's'} but finished with a ${avgMargin}% average margin.`,
-      detail: 'They paid for the information but the sales pattern suggests they did not act on it. Worth exploring why.'
+      headline: `${name} tried market research ${tipsBought} time${tipsBought === 1 ? '' : 's'} and finished with a ${avgMargin}% average margin.`,
+      detail: 'They explored the information tool, which shows initiative. The research-to-outcome link is not yet measurable — this is worth exploring together in conversation.'
     };
   }
 
@@ -4297,6 +4799,23 @@ function buildVocab() {
     vocab.push({ concept: 'licensing', term: 'Licensing', def: 'Official permission to run your business. Your bike came with a $' + BIKE_LICENSE + ' license \u2014 the same kind of fee real businesses pay.', isNew: true, tierWord: true });
   }
 
+  // v19v (Phase D): Tier 1-3 vocabulary. tierWord:true so these lead the recap and
+  // survive the 6-term cap. Each gated on the same trigger used to teach it in-game.
+  if (G.isCareer && G.careerLevel === '1-3' && G.employee) {
+    // Wages — always taught at hire
+    vocab.push({ concept: 'wages', term: 'Wages', def: 'The money you pay someone to work for you. ' + G.employee.name + ' earned $' + G.employee.wage.toFixed(2) + ' per day, every day ' + G.employee.pronounSubject + ' showed up.', isNew: true, tierWord: true });
+    // Labor Cost — taught at hire alongside Wages
+    vocab.push({ concept: 'labor_cost', term: 'Labor Cost', def: 'The total amount you spend on wages. You paid $' + (G.employeeTotalWagesPaid || 0).toFixed(2) + ' in labor this season — a real business expense, no matter how much was sold.', isNew: true, tierWord: true });
+    // Delegation — taught when stand location is placed
+    if (G.standLocation !== null && G.standLocation !== undefined) {
+      vocab.push({ concept: 'delegation', term: 'Delegation', def: 'Letting someone else handle part of your business. ' + G.employee.name + ' ran the stand while you kept working the streets — two sellers, one business.', isNew: true, tierWord: true });
+    }
+    // Training ROI — taught at Day 15 training event
+    if (G.employee.trained) {
+      vocab.push({ concept: 'training_roi', term: 'Return on Investment', def: 'Return on Investment means what you get back from something you put effort or money into. You kept ' + G.employee.name + ' on after the slow start — ' + G.employee.pronounSubject + ' got better, showing up ' + Math.round((G.employee.trainedShowUpRate || G.employee.showUpRate) * 100) + '% of the time instead of ' + Math.round(G.employee.showUpRate * 100) + '%. That improvement is your return.', isNew: true, tierWord: true });
+    }
+  }
+
   return vocab; // v19: full triggered+tagged list; filtering/priority/cap happen below
 }
 
@@ -4320,7 +4839,8 @@ function generateLessons() {
   if (G.netWorth > highNWThreshold) lessons.push({ concept: 'arbitrage', html: ' You mastered the core of business: buy at a low cost, sell at a higher price, and protect your profit margin. That\u2019s called arbitrage \u2014 finding price differences across markets.' });
   if (G.travelCount < (G.days * 0.3)) lessons.push({ concept: 'market_access', html: ' Move around! Different neighborhoods have different prices \u2014 that\u2019s geographic price variance. Traders who travel find better deals.' });
   if (G.travelCount >= (G.days * 0.6)) lessons.push({ concept: 'market_access', html: ' Great mobility! Moving between markets helped you find the best prices. In business, this is called market access.' });
-  if (G.tipCount === 0) lessons.push({ concept: 'market_research', html: ' Paying for information about a market before committing your money is called market research. Next time, try buying tips \u2014 sometimes paying for information saves you money!' });
+  // v19n: No lesson pushed for zero tips. Score is neutral (50); no kid is told
+  // they did something wrong for not using a tool that isn't yet reliably measurable.
   if (G.tipCount > 0) lessons.push({ concept: 'market_research', html: ` You spent $${G.tipSpend} on market research. In real business, information has value \u2014 and your research helped guide your decisions.` });
   if (G.lossCount > 0) lessons.push({ concept: 'margin', html: ` You sold ${G.lossTotalUnits} items below cost across ${G.lossCount} transaction${G.lossCount>1?'s':''}. Each time you sell for less than you paid, your profit margin goes negative. In real business, consistent losses signal a problem \u2014 investors and lenders watch this closely.` });
   if (G.lossCount === 0 && G.sellHistory.length > 0) lessons.push({ concept: 'margin', html: ' You never sold below cost \u2014 every trade had a positive profit margin. That\u2019s strong margin discipline, and it\u2019s exactly what investors look for.' });
