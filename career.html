@@ -379,8 +379,8 @@ canvas{width:100%;height:120px}
     .trend-down { color: #b83a2a; }
     .trend-flat { color: #8a7a68; }
 
-    /* ── Modal ── */
-    .modal {
+    /* ── Dashboard Detail Modal ── */
+    #detailModal {
       display: none;
       position: fixed;
       z-index: 1000;
@@ -388,7 +388,7 @@ canvas{width:100%;height:120px}
       width: 100%; height: 100%;
       background: rgba(0,0,0,0.4);
     }
-    .modal.show { display: flex; align-items: center; justify-content: center; }
+    #detailModal.show { display: flex; align-items: center; justify-content: center; }
     .modal-content {
       background: white;
       padding: 22px;
@@ -817,6 +817,7 @@ const PUBLIC_BUILD = false;
 // ===== ACCESS CODE GATE =====
 const VALID_CODE_HASHES = [
   // DEV codes (build validation)
+  "3978f3bdcd109d4c4a786796b4f3404db569d8a662f6ebcd2e59e9a6568b8b5b", // GoDevils1996
   "c65bce29f3fadd7488f6db5a8dc0485948a1256dca0d82ef982e7b6f5b55db9a",
   "0467bf5c0fcd6200acbf36471c05edf8f38f740d4b87441de5b9fbdaaf10f09a",
   "613dc1686ddfbb7f5d39df7ec8bc84868d40a2463701d64cad89d0bfccb1e337",
@@ -4716,13 +4717,6 @@ function startFreshCareer() {
   render();
 }
 
-// ===== RENDER INTERCEPT: code gate + save state =====
-const _origRenderStart = renderStart;
-function renderStart(app) {
-  if (!isCodeUnlocked()) { showCodeGate(app); return; }
-  _origRenderStart(app);
-}
-
 function checkSaveAfterNames() {
   const save = loadCareerSave(playerInfo.playerName);
   if (save && save.careerLevel) {
@@ -4771,6 +4765,16 @@ function renderStart(app) {
 
   // Names are set — Career only, launch directly
   beginCareerMode();
+}
+
+// ===== RENDER INTERCEPT: code gate =====
+// Must appear AFTER the original renderStart definition above so the
+// wrapper correctly captures it. The second declaration overwrites the
+// first; _origRenderStart holds the real function.
+const _origRenderStart = renderStart;
+function renderStart(app) {
+  if (!isCodeUnlocked()) { showCodeGate(app); return; }
+  _origRenderStart(app);
 }
 
 function submitNames() {
@@ -4957,7 +4961,6 @@ function renderEnd(app) {
     ${G.isCareer ? '<button class="btn btn-primary btn-lg" style="width:100%;margin-top:10px" onclick="replayCareerSeason()">Play Another Season</button>' : ''}
     <button class="btn btn-sell" style="width:100%;margin-top:8px" onclick="downloadSessionJSON()">Download Session as JSON</button>
     <button class="btn btn-tip" style="width:100%;margin-top:8px" onclick="showDashboard()">Open Teacher / Parent Dashboard →</button>
-    <button class="btn btn-tip" style="width:100%;margin-top:8px" onclick="G.viewingReport=true;render()">Get a Teacher/Parent Report</button>
 
     <button class="btn ${G.isCareer ? 'btn-sell' : 'btn-primary btn-lg'}" style="width:100%;margin-top:8px" onclick="G={};render()">Back to Menu</button>
     <div class="copyright-footer">U.S. Patent Pending \u2022 \u00A9 2026 Franklyn Brent Frazier. All rights reserved.<br>Notebook Mogul\u2122 is a proprietary educational simulation.</div>
