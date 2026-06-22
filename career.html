@@ -865,7 +865,7 @@ async function submitAccessCode() {
     const h = await hashCode(code);
     if (VALID_CODE_HASHES.includes(h)) {
       markCodeUnlocked();
-      renderStart(document.getElementById('app'));
+      _renderStartInner(document.getElementById('app'));
     } else {
       errorEl.textContent = 'That code didn\u2019t match \u2014 please check your purchase email and try again.';
       errorEl.style.display = 'block';
@@ -4736,7 +4736,7 @@ function checkSaveAfterNames() {
   }
 }
 
-function renderStart(app) {
+function _renderStartInner(app) {
   // If we don't have names yet, show name entry
   if (!playerInfo.playerName || !playerInfo.businessName) {
     app.innerHTML = `<div class="start-screen">
@@ -4769,13 +4769,9 @@ function renderStart(app) {
 }
 
 // ===== RENDER INTERCEPT: code gate =====
-// Must appear AFTER the original renderStart definition above so the
-// wrapper correctly captures it. The second declaration overwrites the
-// first; _origRenderStart holds the real function.
-const _origRenderStart = renderStart;
 function renderStart(app) {
   if (!isCodeUnlocked()) { showCodeGate(app); return; }
-  _origRenderStart(app);
+  _renderStartInner(app);
 }
 
 function submitNames() {
