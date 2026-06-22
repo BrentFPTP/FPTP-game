@@ -873,6 +873,7 @@ async function submitAccessCode() {
       btn.textContent = 'Unlock';
     }
   } catch(e) {
+    console.error('Gate error:', e, e && e.message, e && e.stack);
     errorEl.textContent = 'Something went wrong. Please refresh and try again.';
     errorEl.style.display = 'block';
     btn.disabled = false;
