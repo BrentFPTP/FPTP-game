@@ -329,100 +329,11 @@ footer {
   transform: translateY(-2px);
 }
 
-/* FULL GAME MODAL */
-#full-game-modal {
-  display: none;
-  position: fixed;
-  inset: 0;
-  z-index: 1000;
-  background: rgba(0,0,0,.55);
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-}
-.modal-box {
-  background: #fff;
-  border-radius: 16px;
-  max-width: 420px;
-  width: 100%;
-  padding: 32px 28px 28px;
-  position: relative;
-  text-align: center;
-  box-shadow: 0 20px 60px rgba(0,0,0,.25);
-}
-.modal-close {
-  position: absolute;
-  top: 14px;
-  right: 18px;
-  background: none;
-  border: none;
-  font-size: 1.4rem;
-  color: var(--muted);
-  cursor: pointer;
-  line-height: 1;
-}
-.modal-close:hover { color: var(--brown); }
-.modal-icon {
-  font-size: 2rem;
-  margin-bottom: 10px;
-}
-.modal-box h3 {
-  font-family: 'Patrick Hand', cursive;
-  font-size: 1.5rem;
-  color: var(--blue);
-  margin-bottom: 12px;
-}
-.modal-box p {
-  font-size: .95rem;
-  color: #4a3a2a;
-  line-height: 1.6;
-  margin-bottom: 20px;
-}
-.modal-notify-btn {
-  background: var(--gold);
-  color: #fff;
-  border: none;
-  padding: 12px 28px;
-  border-radius: 30px;
-  font-size: 1rem;
-  font-weight: 700;
-  cursor: pointer;
-  font-family: 'Nunito', sans-serif;
-  transition: transform .2s;
-}
-.modal-notify-btn:hover { transform: scale(1.04); }
-
 @media(max-width:600px) {
   .hero-buttons { flex-direction: column; align-items: center; }
   .btn-secondary-lg { width: 100%; max-width: 280px; }
   .btn-primary-lg { width: 100%; max-width: 280px; text-align: center; }
 }
-
-/* US FINANCIAL LITERACY MAP */
-.map-section { padding:60px 20px; max-width:900px; margin:0 auto; }
-.map-section h2 { font-family:'Patrick Hand',cursive; font-size:2.2rem; color:var(--blue); margin-bottom:12px; text-align:center; }
-#fl-map-wrap { font-family:'Nunito',sans-serif; }
-#fl-tooltip { position:fixed; pointer-events:none; background:#fff; border:1px solid #e0d6c2; border-radius:10px; padding:10px 14px; font-size:13px; max-width:260px; box-shadow:0 4px 12px rgba(0,0,0,.1); display:none; z-index:9999; font-family:'Nunito',sans-serif; }
-#fl-tooltip .tt-state { font-weight:700; font-size:14px; color:#3a3228; margin-bottom:4px; }
-#fl-tooltip .tt-type { font-size:12px; color:#7a6a58; }
-#fl-tooltip .tt-badge { display:inline-block; margin-top:6px; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:700; }
-.tt-standalone { background:#4a6a3a; color:#fff; }
-.tt-integrated { background:#c8dfc8; color:#2a4a2a; }
-.tt-none { background:#e0d6c2; color:#5a4a3a; }
-#fl-legend { display:flex; flex-wrap:wrap; gap:12px; margin-bottom:10px; font-size:12px; color:var(--muted); }
-#fl-legend span { display:flex; align-items:center; gap:6px; }
-#fl-legend i { display:inline-block; width:14px; height:14px; border-radius:3px; flex-shrink:0; }
-.l-standalone { background:#4a6a3a; }
-.l-integrated { background:#c8dfc8; border:1px solid #4a6a3a; }
-.l-none { background:#e0d6c2; }
-#fl-stat { font-size:11px; color:var(--muted); margin-bottom:8px; }
-#fl-map svg { width:100%; display:block; }
-path.state { cursor:pointer; stroke:#fff; stroke-width:0.5px; transition:opacity .15s; }
-path.state:hover { opacity:.75; }
-path.state.standalone { fill:#4a6a3a; }
-path.state.integrated { fill:#c8dfc8; }
-path.state.none-req { fill:#e0d6c2; }
-@media(max-width:600px) { .map-section { padding:40px 16px; } #fl-legend { flex-direction:column; gap:8px; } }
 </style>
 </head>
 <body>
@@ -435,7 +346,7 @@ path.state.none-req { fill:#e0d6c2; }
   <div class="cta-group">
     <div class="hero-buttons">
       <a href="play.html" class="btn-primary-lg">Play Free &rarr;</a>
-      <button class="btn-secondary-lg" onclick="document.getElementById('full-game-modal').style.display='flex'">Get the Full Game</button>
+      <a href="https://buy.stripe.com/aFa00igH72TH0OgaCuaR200" class="btn-secondary-lg" target="_blank" rel="noopener">Get the Full Game</a>
     </div>
   </div>
   <div class="scroll-hint">&darr; Scroll to learn more</div>
@@ -527,26 +438,6 @@ path.state.none-req { fill:#e0d6c2; }
   </div>
 </section>
 
-<!-- US FINANCIAL LITERACY MAP -->
-<section class="map-section">
-  <h2>Financial Literacy Is Now a Graduation Requirement in 41 States</h2>
-  <p style="text-align:center;color:var(--muted);max-width:580px;margin:0 auto 24px;">Hover over any state to see its requirement. Notebook Mogul aligns with the national standards these laws are built on.</p>
-  <div id="fl-map-wrap">
-    <div id="fl-legend">
-      <span><i class="l-standalone"></i> Standalone course required (30 states)</span>
-      <span><i class="l-integrated"></i> Integrated / partial requirement (11 states)</span>
-      <span><i class="l-none"></i> No current requirement (9 states)</span>
-    </div>
-    <div id="fl-stat">Data: NEFE / NASBE, June 2026</div>
-    <div id="fl-map"></div>
-  </div>
-</section>
-<div id="fl-tooltip">
-  <div class="tt-state" id="tt-name"></div>
-  <div class="tt-type" id="tt-detail"></div>
-  <span class="tt-badge" id="tt-badge"></span>
-</div>
-
 <!-- STORY -->
 <div class="story-section">
   <div class="story-inner">
@@ -628,123 +519,6 @@ path.state.none-req { fill:#e0d6c2; }
   <p>U.S. Patent Pending &bull; &copy; 2026 Franklyn Brent Frazier. All rights reserved. Notebook Mogul&trade; is a proprietary educational simulation.</p>
 </footer>
 
-
-<!-- FULL GAME MODAL -->
-<div id="full-game-modal" onclick="if(event.target===this)this.style.display='none'">
-  <div class="modal-box">
-    <button class="modal-close" onclick="document.getElementById('full-game-modal').style.display='none'">&times;</button>
-    <div class="modal-icon">&#128218;</div>
-    <h3>The Full Game Is Coming Soon</h3>
-    <p>We're putting the finishing touches on Notebook Mogul's full experience. Sign up below to be the first to know when it's available — or follow us on X for updates along the way.</p>
-    <button class="modal-notify-btn" onclick="document.getElementById('full-game-modal').style.display='none';document.querySelector('.signup-section').scrollIntoView({behavior:'smooth'})">Notify Me When It's Ready</button>
-    <p style="margin-top:14px;margin-bottom:0;font-size:.82rem;color:var(--muted)">Follow <a href="https://x.com/notebookmogul" target="_blank" style="color:var(--gold);font-weight:700;text-decoration:none">@notebookmogul on X</a></p>
-  </div>
-</div>
-
-<!-- US FINANCIAL LITERACY MAP SCRIPTS -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js"></script>
-<script>
-(function(){
-  var stateData = {
-    "01":{name:"Alabama",type:"standalone",detail:"Standalone course required for graduation (since 2013–14)"},
-    "02":{name:"Alaska",type:"none",detail:"No statewide graduation requirement"},
-    "04":{name:"Arizona",type:"integrated",detail:"Financial literacy integrated into social studies / economics standards"},
-    "05":{name:"Arkansas",type:"integrated",detail:"Financial literacy integrated into existing K-12 curriculum"},
-    "06":{name:"California",type:"standalone",detail:"Standalone course required starting with class of 2030–31"},
-    "08":{name:"Colorado",type:"standalone",detail:"Standalone course required (HB 1192, signed May 2025)"},
-    "09":{name:"Connecticut",type:"standalone",detail:"Standalone course required for graduation (since 2023)"},
-    "10":{name:"Delaware",type:"standalone",detail:"Half-credit standalone course required (class of 2026–27)"},
-    "12":{name:"Florida",type:"standalone",detail:"Half-credit financial literacy course required for graduation (class of 2027)"},
-    "13":{name:"Georgia",type:"standalone",detail:"Half-credit financial literacy course required starting class of 2028"},
-    "15":{name:"Hawaii",type:"none",detail:"No statewide graduation requirement"},
-    "16":{name:"Idaho",type:"integrated",detail:"Financial literacy integrated into economics and existing requirements"},
-    "17":{name:"Illinois",type:"none",detail:"No statewide graduation requirement"},
-    "18":{name:"Indiana",type:"standalone",detail:"Standalone half-credit course required for graduation (since 2023)"},
-    "19":{name:"Iowa",type:"standalone",detail:"Financial literacy course required for graduation"},
-    "20":{name:"Kansas",type:"standalone",detail:"Standalone half-credit course required for graduation"},
-    "21":{name:"Kentucky",type:"standalone",detail:"One-credit financial literacy course required (since July 2025)"},
-    "22":{name:"Louisiana",type:"standalone",detail:"One-semester standalone course required (since 2023)"},
-    "23":{name:"Maine",type:"integrated",detail:"Financial literacy embedded in social studies courses (2025 legislation)"},
-    "24":{name:"Maryland",type:"integrated",detail:"Districts required to offer standalone course; no statewide graduation requirement"},
-    "25":{name:"Massachusetts",type:"none",detail:"No statewide graduation requirement"},
-    "26":{name:"Michigan",type:"standalone",detail:"Half-credit personal finance and economics course required"},
-    "27":{name:"Minnesota",type:"standalone",detail:"Standalone course required for graduation (since May 2023)"},
-    "28":{name:"Mississippi",type:"standalone",detail:"Financial literacy integrated into required economics course"},
-    "29":{name:"Missouri",type:"standalone",detail:"Standalone course required (since 2017)"},
-    "30":{name:"Montana",type:"integrated",detail:"Financial literacy embedded in existing K-12 curriculum"},
-    "31":{name:"Nebraska",type:"standalone",detail:"Standalone personal finance course required for graduation"},
-    "32":{name:"Nevada",type:"integrated",detail:"Financial literacy integrated into existing requirements"},
-    "33":{name:"New Hampshire",type:"standalone",detail:"Financial literacy course required for graduation"},
-    "34":{name:"New Jersey",type:"none",detail:"No statewide graduation requirement"},
-    "35":{name:"New Mexico",type:"integrated",detail:"Financial literacy integrated into existing requirements"},
-    "36":{name:"New York",type:"none",detail:"No statewide graduation requirement"},
-    "37":{name:"North Carolina",type:"standalone",detail:"Half-credit financial literacy course required for graduation"},
-    "38":{name:"North Dakota",type:"integrated",detail:"Financial literacy embedded in social studies (2025 legislation)"},
-    "39":{name:"Ohio",type:"standalone",detail:"Standalone financial literacy course required for graduation"},
-    "40":{name:"Oklahoma",type:"none",detail:"No statewide graduation requirement"},
-    "41":{name:"Oregon",type:"standalone",detail:"One-semester course required (since 2023)"},
-    "42":{name:"Pennsylvania",type:"standalone",detail:"Half-credit standalone course required (since Dec 2023)"},
-    "44":{name:"Rhode Island",type:"standalone",detail:"Proficiency in financial literacy required"},
-    "45":{name:"South Carolina",type:"standalone",detail:"Standalone financial literacy course required for graduation"},
-    "46":{name:"South Dakota",type:"none",detail:"No statewide graduation requirement"},
-    "47":{name:"Tennessee",type:"standalone",detail:"Half-credit financial literacy course required (since class of 2013)"},
-    "48":{name:"Texas",type:"standalone",detail:"Half-credit personal financial literacy course required (HB 27, class of 2026–27). Also embedded in K-8 math TEKS."},
-    "49":{name:"Utah",type:"standalone",detail:"Standalone financial literacy course required (first state to require it, since 2008)"},
-    "50":{name:"Vermont",type:"integrated",detail:"Statewide standards for financial literacy; integrated into curriculum"},
-    "51":{name:"Virginia",type:"standalone",detail:"Full-credit Economics & Personal Finance course required for graduation"},
-    "53":{name:"Washington",type:"none",detail:"No statewide graduation requirement"},
-    "54":{name:"West Virginia",type:"standalone",detail:"Half-semester financial literacy course required for graduation"},
-    "55":{name:"Wisconsin",type:"standalone",detail:"Half-credit standalone course required (since Dec 2023)"},
-    "56":{name:"Wyoming",type:"none",detail:"No statewide graduation requirement"}
-  };
-
-  var tip = document.getElementById('fl-tooltip');
-  var ttName = document.getElementById('tt-name');
-  var ttDetail = document.getElementById('tt-detail');
-  var ttBadge = document.getElementById('tt-badge');
-  var badgeLabel = {standalone:'Standalone required',integrated:'Integrated / partial',none:'No requirement'};
-  var badgeClass = {standalone:'tt-standalone',integrated:'tt-integrated',none:'tt-none'};
-
-  var svg = d3.select('#fl-map').append('svg').attr('viewBox','0 0 975 610');
-
-  d3.json('https://cdn.jsdelivr.net/npm/us-atlas@3/states-albers-10m.json').then(function(us){
-    var features = topojson.feature(us, us.objects.states).features;
-    svg.selectAll('path.state')
-      .data(features)
-      .join('path')
-      .attr('class', function(d){
-        var id = String(d.id).padStart(2,'0');
-        var s = stateData[id];
-        if(!s) return 'state none-req';
-        if(s.type==='standalone') return 'state standalone';
-        if(s.type==='integrated') return 'state integrated';
-        return 'state none-req';
-      })
-      .attr('d', d3.geoPath())
-      .on('mousemove', function(event, d){
-        var id = String(d.id).padStart(2,'0');
-        var s = stateData[id];
-        if(!s) return;
-        ttName.textContent = s.name;
-        ttDetail.textContent = s.detail;
-        ttBadge.textContent = badgeLabel[s.type];
-        ttBadge.className = 'tt-badge ' + badgeClass[s.type];
-        tip.style.display = 'block';
-        tip.style.left = (event.clientX + 14) + 'px';
-        tip.style.top = (event.clientY - 10) + 'px';
-      })
-      .on('mouseleave', function(){ tip.style.display = 'none'; });
-
-    svg.append('path')
-      .datum(topojson.mesh(us, us.objects.states, function(a,b){ return a!==b; }))
-      .attr('fill','none').attr('stroke','#fff').attr('stroke-width','0.5')
-      .attr('d', d3.geoPath());
-  }).catch(function(){
-    document.getElementById('fl-map').innerHTML = '<p style="color:var(--muted);font-size:13px;padding:2rem 0;text-align:center">Map could not load. Please check your connection.</p>';
-  });
-})();
-</script>
 
 </body>
 </html>
